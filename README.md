@@ -32,7 +32,10 @@ immutable deterministic 2-of-3 quorum and remains restart-safe. Network
 submission and private-key handling remain deliberately excluded. The isolated
 signer service enforces a pinned route, chain, vault, amount and deadline,
 requires an independent canonical-finality verifier, and delegates signing to
-an injected external key provider. No operator key loader is included.
+an injected external key provider. No operator key loader is included. Runtime
+composition validates separated identities and independent RPC origins, halts
+on critical worker failure, and exposes bounded liveness and readiness state.
+Hardened systemd units are provided as disabled review-only templates.
 
 ## Validation
 
