@@ -1,9 +1,35 @@
 import { FinalityViolation } from "./watchers.js";
+import { collectApprovalQuorum } from "./approvals.js";
 
 function height(value, label) {
   const number = Number(value);
   if (!Number.isSafeInteger(number) || number < 0) throw new Error(`${label} must be a non-negative safe integer`);
   return number;
+}
+
+export async function approveFinalizedTransfer({
+  store,
+  sourceChain,
+  sourceRef,
+  request,
+  clients,
+  authorizedSigners,
+  threshold = 2,
+  nowUnix,
+}) {
+  if (!store || !sourceChain || !sourceRef) throw new Error("store and source transfer are required");
+  const transfer = store.get(sourceChain, sourceRef);
+  if (!transfer) throw new Error("transfer not found");
+  if (transfer.state === "approved") {
+    return { transfer, approvals: store.approvals(sourceChain, sourceRef), idempotent: true };
+  }
+  if (transfer.state !== "finalized") throw new Error("only finalized transfers may be approved");
+  const approvals = await collectApprovalQuorum({
+    clients, request, authorizedSigners, threshold, nowUnix,
+  });
+  for (const approval of approvals) store.recordApproval(sourceChain, sourceRef, approval);
+  const approved = store.transition(sourceChain, sourceRef, "approved");
+  return { transfer: approved, approvals: store.approvals(sourceChain, sourceRef), idempotent: false };
 }
 
 export async function scanFinalizedBatch({ watcher, store, sourceChain, startHeight = 1, maxBatch = 100 }) {

@@ -47,6 +47,19 @@ The coordinator is restart-safe. It resumes non-terminal records from the local
 store and queries the destination replay-protection state before resubmission.
 Operators must never delete a pending database merely to clear an error.
 
+## Signer transport
+
+- Give every signer endpoint a stable, unique operator identity and an
+  independent HTTPS origin.
+- Never embed credentials in signer URLs; inject authentication in a private
+  runtime wrapper outside this repository.
+- Keep signer response limits and timeouts bounded, reject redirects, and stop
+  on any invalid response instead of silently lowering the quorum.
+- Rotate the configured signer set atomically with the on-chain signer-set
+  version. Old-domain approvals must never be reused.
+- The public coordinator stores signatures because they are transaction input,
+  not secrets. Metrics and logs must nevertheless omit them.
+
 ## Activation sequence
 
 Protocol vectors, watcher tests, signer isolation tests, testnet deployment,

@@ -57,3 +57,18 @@ Every source reference is unique within its source chain and route. The local
 store rejects lifecycle regression, while both destination implementations
 enforce their own replay protection. Local completion is recorded only after a
 finalized destination receipt.
+
+## Approval coordinator
+
+The coordinator never receives private keys. It sends the complete canonical
+payload and its independently recomputed digest to three isolated signer
+services. Every returned signature is recovered locally against the currently
+authorized three-address signer set. Exactly two distinct valid approvals are
+selected in deterministic address order and persisted before the lifecycle is
+advanced to `approved`.
+
+Signer services must recompute the digest and re-check the finalized source
+event themselves. A mismatched digest, unauthorized or duplicate signer,
+expired deadline, wrong chain/vault domain, malformed response, or conflicting
+previous approval stops processing. Approval collection does not submit a
+transaction to either destination chain.

@@ -2,6 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { scanFinalizedBatch } from "../src/coordinator.js";
+import { approveFinalizedTransfer } from "../src/coordinator.js";
+import { buildApprovalRequest } from "../src/approvals.js";
+import { DIRECTION_INBOUND } from "../src/protocol.js";
+import { SigningKey, computeAddress } from "ethers";
+import { randomBytes } from "node:crypto";
 import { RelayStore } from "../src/store.js";
 import { FinalityViolation } from "../src/watchers.js";
 
@@ -59,5 +64,27 @@ test("scan loop stops before checkpointing invalid source or block identity", as
     store, sourceChain: "cronos", startHeight: 10,
   }), FinalityViolation);
   assert.equal(store.checkpoint("cronos"), undefined);
+  store.close();
+});
+
+test("approval coordinator advances only after a valid quorum and is restart-safe", async () => {
+  const store = new RelayStore();
+  const record = { sourceChain: "cronos", sourceRef: `0x${"aa".repeat(32)}`, routeId: "route", blockHeight: 10, blockHash, payload: { amount: "10" } };
+  store.observe(record);
+  store.transition("cronos", record.sourceRef, "finalized");
+  const keys = Array.from({ length: 3 }, () => new SigningKey(randomBytes(32)));
+  const addresses = keys.map((key) => computeAddress(key.publicKey));
+  const request = buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
+    routeId: "cronos-xitcoin-xtc-v1", sourceChainId: "25", sourceRef: record.sourceRef,
+    nonce: "7", destination: "xitcoin1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3rsflhv", amount: "10", deadlineUnix: 2_000_000_000,
+  } });
+  const clients = keys.slice(0, 2).map((key, index) => ({ identity: `signer-${index}`, async approve(value) {
+    return { digest: value.digest, signer: addresses[index], signature: key.sign(value.digest).serialized };
+  } }));
+  const result = await approveFinalizedTransfer({ store, sourceChain: "cronos", sourceRef: record.sourceRef, request, clients, authorizedSigners: addresses, nowUnix: 1_900_000_000 });
+  assert.equal(result.transfer.state, "approved");
+  assert.equal(result.approvals.length, 2);
+  const restarted = await approveFinalizedTransfer({ store, sourceChain: "cronos", sourceRef: record.sourceRef, request, clients, authorizedSigners: addresses, nowUnix: 1_900_000_000 });
+  assert.equal(restarted.idempotent, true);
   store.close();
 });
