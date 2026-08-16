@@ -26,8 +26,10 @@ clients. Hardened network adapters pin chain identities, reject embedded RPC
 credentials and require independent HTTPS origins. The restart-safe scan loop
 advances checkpoints only after a second canonical event and block verification.
 Xitcoin message decoding remains an explicit canonical dependency rather than a
-heuristic event parser. Network submission and signer transport remain
-deliberately excluded.
+heuristic event parser. The approval coordinator requests bounded HTTPS
+responses from isolated signers, recovers each signer locally, persists an
+immutable deterministic 2-of-3 quorum and remains restart-safe. Network
+submission and private-key handling remain deliberately excluded.
 
 ## Validation
 

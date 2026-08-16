@@ -44,3 +44,15 @@ test("persists monotonic canonical checkpoints", () => {
   assert.throws(() => store.advanceCheckpoint("cronos", 101, hashOne), /finality violation/);
   store.close();
 });
+
+test("persists immutable signer approvals idempotently", () => {
+  const store = new RelayStore();
+  store.observe(observed());
+  store.transition("cronos:25", observed().sourceRef, "finalized");
+  const approval = { signer: "0x1111111111111111111111111111111111111111", digest: `0x${"22".repeat(32)}`, signature: `0x${"33".repeat(65)}` };
+  store.recordApproval("cronos:25", observed().sourceRef, approval);
+  store.recordApproval("cronos:25", observed().sourceRef, approval);
+  assert.equal(store.approvals("cronos:25", observed().sourceRef).length, 1);
+  assert.throws(() => store.recordApproval("cronos:25", observed().sourceRef, { ...approval, signature: `0x${"44".repeat(65)}` }), /conflicting/);
+  store.close();
+});

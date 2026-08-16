@@ -30,6 +30,17 @@ export class RelayStore {
         block_hash TEXT NOT NULL,
         updated_at INTEGER NOT NULL
       ) STRICT;
+      CREATE TABLE IF NOT EXISTS approvals (
+        source_chain TEXT NOT NULL,
+        source_ref TEXT NOT NULL,
+        signer TEXT NOT NULL,
+        digest TEXT NOT NULL,
+        signature TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (source_chain, source_ref, signer),
+        FOREIGN KEY (source_chain, source_ref)
+          REFERENCES transfers(source_chain, source_ref)
+      ) STRICT;
     `);
   }
 
@@ -92,6 +103,43 @@ export class RelayStore {
     return this.database.prepare(
       "SELECT * FROM transfers WHERE state NOT IN ('completed', 'failed', 'reorged') ORDER BY updated_at",
     ).all();
+  }
+
+  recordApproval(sourceChain, sourceRef, approval) {
+    const current = this.get(sourceChain, sourceRef);
+    if (!current) throw new Error("transfer not found");
+    if (current.state !== "finalized" && current.state !== "approved") {
+      throw new Error("approvals may only be recorded for finalized transfers");
+    }
+    const signer = String(approval.signer).toLowerCase();
+    const digest = String(approval.digest).toLowerCase();
+    const signature = String(approval.signature).toLowerCase();
+    const existing = this.database.prepare(`
+      SELECT * FROM approvals
+      WHERE source_chain = ? AND source_ref = ? AND signer = ?
+    `).get(sourceChain, sourceRef.toLowerCase(), signer);
+    if (existing) {
+      if (existing.digest !== digest || existing.signature !== signature) {
+        throw new Error("conflicting signer approval");
+      }
+      return existing;
+    }
+    this.database.prepare(`
+      INSERT INTO approvals
+        (source_chain, source_ref, signer, digest, signature, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(sourceChain, sourceRef.toLowerCase(), signer, digest, signature, Math.floor(Date.now() / 1000));
+    return this.database.prepare(`
+      SELECT * FROM approvals
+      WHERE source_chain = ? AND source_ref = ? AND signer = ?
+    `).get(sourceChain, sourceRef.toLowerCase(), signer);
+  }
+
+  approvals(sourceChain, sourceRef) {
+    return this.database.prepare(`
+      SELECT signer, digest, signature, created_at FROM approvals
+      WHERE source_chain = ? AND source_ref = ? ORDER BY signer
+    `).all(sourceChain, sourceRef.toLowerCase());
   }
 
   checkpoint(sourceChain) {
