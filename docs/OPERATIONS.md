@@ -122,3 +122,13 @@ Never manually retry an approved or submitted transfer. Restart the coordinator:
 - Reject wrong chain identities, catching-up nodes and non-independent RPCs.
 - A passing preflight permits review of a testnet canary plan only; it does not
   authorize service activation, key loading, deployment or a transaction.
+
+## Controlled testnet canary
+
+- Follow [`CANARY.md`](CANARY.md) under a separate, time-bounded authorization.
+- Bind the decision to the immutable release and successful preflight digest.
+- Permit exactly one small finalized transfer per canonical direction.
+- Stop immediately on disagreement, quorum loss, readiness loss, finality
+  failure, destination mismatch or duplicate-broadcast evidence.
+- Publish only sanitized transaction hashes and the SHA-256 report digest.
+- Require a separate final review before any unrestricted or live activation.

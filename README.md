@@ -42,6 +42,9 @@ recovery and duplicate-broadcast prevention without contacting a network.
 The testnet preflight validates a commit-pinned release, separated locked
 identities, private paths, disabled services and independently verified chain
 identities before any canary is authorized.
+The controlled-canary plan binds a short authorization window to the release
+and preflight digests, permits exactly one bounded transfer in each direction,
+stops on any safety violation and emits only sanitized transaction evidence.
 
 ## Validation
 
