@@ -98,6 +98,17 @@ activation.
   enable or start them until private adapters, host paths and sandbox controls
   have passed staging review.
 
+## Staging rehearsals
+
+- Run every scenario in [`STAGING.md`](STAGING.md) before introducing private
+  adapters or operator credentials.
+- Preserve only the sanitized report digest and pass/fail codes. Never persist
+  test signatures, payloads, RPC responses or injected private errors.
+- A failed scenario blocks activation. Do not lower quorum, skip canonical
+  checks, advance checkpoints or retry a broadcast to make a rehearsal pass.
+- Repeat the complete rehearsal after any protocol, watcher, signer, runtime,
+  dependency or destination-contract change.
+
 ## Submission recovery
 
 Never manually retry an approved or submitted transfer. Restart the coordinator: it queries the destination status first and resumes from the persisted transaction reference. Broadcasters must be separate, authenticated components. The Xitcoin deployment requires a canonical public attestation-status client before activation.

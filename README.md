@@ -36,6 +36,9 @@ an injected external key provider. No operator key loader is included. Runtime
 composition validates separated identities and independent RPC origins, halts
 on critical worker failure, and exposes bounded liveness and readiness state.
 Hardened systemd units are provided as disabled review-only templates.
+The deterministic staging harness composes the real public lifecycle functions
+with in-memory adapters to rehearse one-signer loss, RPC disagreement, crash
+recovery and duplicate-broadcast prevention without contacting a network.
 
 ## Validation
 
