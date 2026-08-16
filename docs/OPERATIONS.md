@@ -83,6 +83,21 @@ fault injection and an independent security review must all succeed before a
 route configuration is proposed. Deployment alone does not authorize route
 activation.
 
+## Runtime composition
+
+- Keep coordinator, three signers and two destination submitters under seven
+  distinct operating-system identities.
+- Require at least two independent HTTPS RPC origins for each chain and reject
+  credentials embedded in URLs.
+- A critical watcher, approval or submission worker failure halts the runtime;
+  operators must investigate instead of skipping the failed stage.
+- `/livez` reports process liveness. `/readyz` becomes successful only after
+  every worker has completed recently and successfully. Health output contains
+  no payload, signature, endpoint, credential or raw error message.
+- The units under `ops/systemd` are documentation templates. Do not install,
+  enable or start them until private adapters, host paths and sandbox controls
+  have passed staging review.
+
 ## Submission recovery
 
 Never manually retry an approved or submitted transfer. Restart the coordinator: it queries the destination status first and resumes from the persisted transaction reference. Broadcasters must be separate, authenticated components. The Xitcoin deployment requires a canonical public attestation-status client before activation.

@@ -1,0 +1,29 @@
+[Unit]
+Description=Xitcoin bridge destination submitter %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xitcoin-bridge-submitter-%i
+Group=xitcoin-bridge-submitter-%i
+UMask=0077
+WorkingDirectory=/opt/xitcoin-bridge-relayer/current
+ExecStart=/usr/bin/env node /opt/xitcoin-bridge-runtime/submitter.mjs --destination %i
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
