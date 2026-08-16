@@ -22,7 +22,12 @@ portable test vectors and finalized source watchers. Cronos observations require
 agreement between independent RPC providers, a configured confirmation depth and
 a canonical receipt re-check. Xitcoin observations require matching CometBFT
 chain identity, block hashes and decoded outbound messages from independent
-clients. Network submission and signer transport remain deliberately excluded.
+clients. Hardened network adapters pin chain identities, reject embedded RPC
+credentials and require independent HTTPS origins. The restart-safe scan loop
+advances checkpoints only after a second canonical event and block verification.
+Xitcoin message decoding remains an explicit canonical dependency rather than a
+heuristic event parser. Network submission and signer transport remain
+deliberately excluded.
 
 ## Validation
 

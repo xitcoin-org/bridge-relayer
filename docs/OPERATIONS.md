@@ -27,6 +27,20 @@ at the same height with a different hash is a finality violation and stops the
 process. Operators must investigate RPC disagreement or a deep reorganization;
 the process must never select one provider silently.
 
+## Network adapters
+
+- Configure at least two independent HTTPS origins for each source chain.
+- Never place API keys, usernames or passwords inside an RPC URL. Inject secret
+  headers only in a private runtime wrapper outside this public repository.
+- Pin Cronos chain ID `25` and the intended Xitcoin CometBFT chain ID before any
+  scan begins.
+- Reject catching-up Xitcoin nodes, redirects, oversized responses and malformed
+  JSON instead of silently retrying a different interpretation.
+- Supply the Xitcoin outbound-message decoder from the canonical chain schema.
+  The transport deliberately does not guess event attribute names.
+- Run the scan loop without signer or submitter credentials. A successful scan
+  records only `observed`, `finalized` and checkpoint state.
+
 ## Recovery
 
 The coordinator is restart-safe. It resumes non-terminal records from the local
