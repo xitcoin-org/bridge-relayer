@@ -60,6 +60,22 @@ Operators must never delete a pending database merely to clear an error.
 - The public coordinator stores signatures because they are transaction input,
   not secrets. Metrics and logs must nevertheless omit them.
 
+## Isolated signer services
+
+- Run each `IsolatedSignerService` under a distinct operating-system identity
+  and preferably on independent infrastructure and RPC providers.
+- Inject `verifySource` and `signDigest` from private runtime adapters. The
+  public service neither loads nor stores private keys.
+- Pin the canonical route, Cronos chain ID, vault, maximum amount and maximum
+  deadline window independently on every signer.
+- Require transport authorization before reading request bodies. Terminate TLS
+  and mutual authentication in a hardened private ingress; never expose the
+  approval endpoint directly to the public Internet.
+- A signer must independently confirm canonical source finality. Coordinator
+  approval or another signer's response is never sufficient evidence.
+- Treat source disagreement, a mismatched digest, a wrong signing account or an
+  expired request as a hard rejection and emit no signature.
+
 ## Activation sequence
 
 Protocol vectors, watcher tests, signer isolation tests, testnet deployment,
