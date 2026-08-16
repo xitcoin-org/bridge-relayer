@@ -1,5 +1,6 @@
 import { FinalityViolation } from "./watchers.js";
 import { collectApprovalQuorum } from "./approvals.js";
+export { submitApprovedTransfer } from "./submission.js";
 
 function height(value, label) {
   const number = Number(value);

@@ -66,3 +66,7 @@ Protocol vectors, watcher tests, signer isolation tests, testnet deployment,
 fault injection and an independent security review must all succeed before a
 route configuration is proposed. Deployment alone does not authorize route
 activation.
+
+## Submission recovery
+
+Never manually retry an approved or submitted transfer. Restart the coordinator: it queries the destination status first and resumes from the persisted transaction reference. Broadcasters must be separate, authenticated components. The Xitcoin deployment requires a canonical public attestation-status client before activation.
