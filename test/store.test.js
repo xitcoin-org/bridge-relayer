@@ -33,3 +33,14 @@ test("rejects lifecycle regression", () => {
   assert.throws(() => store.transition("cronos:25", observed().sourceRef, "observed"));
   store.close();
 });
+
+test("persists monotonic canonical checkpoints", () => {
+  const store = new RelayStore();
+  const hashOne = `0x${"11".repeat(32)}`;
+  const hashTwo = `0x${"22".repeat(32)}`;
+  assert.equal(store.advanceCheckpoint("cronos", 100, hashOne).block_height, 100);
+  assert.equal(store.advanceCheckpoint("cronos", 101, hashTwo).block_hash, hashTwo);
+  assert.throws(() => store.advanceCheckpoint("cronos", 100, hashOne), /regression/);
+  assert.throws(() => store.advanceCheckpoint("cronos", 101, hashOne), /finality violation/);
+  store.close();
+});
