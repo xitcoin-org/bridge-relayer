@@ -16,11 +16,13 @@ Cronos vault.
 
 ## Current scope
 
-The protocol foundation provides canonical identifiers, address conversion,
-EIP-712 release digests, Xitcoin attestation digests, lifecycle persistence and
-portable test vectors. Network submission and signer transport are deliberately
-excluded until the protocol vectors have been verified against both canonical
-repositories.
+The current foundation provides canonical identifiers, address conversion,
+EIP-712 release digests, Xitcoin attestation digests, lifecycle persistence,
+portable test vectors and finalized source watchers. Cronos observations require
+agreement between independent RPC providers, a configured confirmation depth and
+a canonical receipt re-check. Xitcoin observations require matching CometBFT
+chain identity, block hashes and decoded outbound messages from independent
+clients. Network submission and signer transport remain deliberately excluded.
 
 ## Validation
 

@@ -19,6 +19,14 @@
   confirmation window, signer-set mismatch or route pause.
 - Expose health and metrics without exposing payload signatures or credentials.
 
+## Watcher checkpoints
+
+Each watcher advances its checkpoint only after every event in the scanned
+range has passed a second canonical block and transaction check. A checkpoint
+at the same height with a different hash is a finality violation and stops the
+process. Operators must investigate RPC disagreement or a deep reorganization;
+the process must never select one provider silently.
+
 ## Recovery
 
 The coordinator is restart-safe. It resumes non-terminal records from the local

@@ -24,6 +24,12 @@ export class RelayStore {
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (source_chain, source_ref)
       ) STRICT;
+      CREATE TABLE IF NOT EXISTS checkpoints (
+        source_chain TEXT PRIMARY KEY,
+        block_height INTEGER NOT NULL,
+        block_hash TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      ) STRICT;
     `);
   }
 
@@ -86,6 +92,34 @@ export class RelayStore {
     return this.database.prepare(
       "SELECT * FROM transfers WHERE state NOT IN ('completed', 'failed', 'reorged') ORDER BY updated_at",
     ).all();
+  }
+
+  checkpoint(sourceChain) {
+    return this.database.prepare(
+      "SELECT * FROM checkpoints WHERE source_chain = ?",
+    ).get(sourceChain);
+  }
+
+  advanceCheckpoint(sourceChain, blockHeight, blockHash) {
+    if (!Number.isSafeInteger(blockHeight) || blockHeight < 0) {
+      throw new Error("checkpoint height must be a non-negative safe integer");
+    }
+    const normalizedHash = String(blockHash).toLowerCase();
+    if (!/^0x[0-9a-f]{64}$/.test(normalizedHash)) throw new Error("invalid checkpoint hash");
+    const current = this.checkpoint(sourceChain);
+    if (current && blockHeight < current.block_height) throw new Error("checkpoint regression");
+    if (current && blockHeight === current.block_height && normalizedHash !== current.block_hash) {
+      throw new Error("checkpoint finality violation");
+    }
+    this.database.prepare(`
+      INSERT INTO checkpoints (source_chain, block_height, block_hash, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(source_chain) DO UPDATE SET
+        block_height = excluded.block_height,
+        block_hash = excluded.block_hash,
+        updated_at = excluded.updated_at
+    `).run(sourceChain, blockHeight, normalizedHash, Math.floor(Date.now() / 1000));
+    return this.checkpoint(sourceChain);
   }
 
   close() {
