@@ -112,3 +112,13 @@ activation.
 ## Submission recovery
 
 Never manually retry an approved or submitted transfer. Restart the coordinator: it queries the destination status first and resumes from the persisted transaction reference. Broadcasters must be separate, authenticated components. The Xitcoin deployment requires a canonical public attestation-status client before activation.
+
+## Testnet preflight
+
+- Follow [`PREFLIGHT.md`](PREFLIGHT.md) with a full immutable release commit.
+- Confirm all six runtime identities are distinct, locked and non-interactive.
+- Require owner-bound state directories and wrappers with mode `0700` or stricter.
+- Confirm every bridge service remains inactive and disabled during preflight.
+- Reject wrong chain identities, catching-up nodes and non-independent RPCs.
+- A passing preflight permits review of a testnet canary plan only; it does not
+  authorize service activation, key loading, deployment or a transaction.

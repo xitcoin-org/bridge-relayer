@@ -39,6 +39,9 @@ Hardened systemd units are provided as disabled review-only templates.
 The deterministic staging harness composes the real public lifecycle functions
 with in-memory adapters to rehearse one-signer loss, RPC disagreement, crash
 recovery and duplicate-broadcast prevention without contacting a network.
+The testnet preflight validates a commit-pinned release, separated locked
+identities, private paths, disabled services and independently verified chain
+identities before any canary is authorized.
 
 ## Validation
 
