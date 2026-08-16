@@ -42,3 +42,5 @@ npm run vectors
 
 See [`docs/PROTOCOL.md`](docs/PROTOCOL.md) and
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
+Destination submission is restart-safe: the coordinator checks the canonical destination state before broadcasting, persists the transaction reference, and completes only after a matching finalized confirmation. Broadcasters and status clients are injected; this repository stores no operator key.

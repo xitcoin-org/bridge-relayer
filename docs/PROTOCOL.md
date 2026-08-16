@@ -72,3 +72,7 @@ event themselves. A mismatched digest, unauthorized or duplicate signer,
 expired deadline, wrong chain/vault domain, malformed response, or conflicting
 previous approval stops processing. Approval collection does not submit a
 transaction to either destination chain.
+
+## Destination submission
+
+An approved transfer is checked against the destination replay key before broadcast. Cronos uses `sourceBurnId`; Xitcoin uses `attestationId`. A recovered processed record must include a canonical transaction reference. A submission becomes completed only after the finalized receipt/event matches every bound field. RPC disagreement or a mismatched event stops processing.
