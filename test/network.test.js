@@ -45,12 +45,12 @@ function client(fetchImpl = rpcFetch([])) {
     chainId: "xitcoin-testnet-1",
     decodeBlock: ({ height }) => height === 90 ? [{
       routeId: "route", transactionHash: txHash, messageIndex: 0, requestId: blockHash,
-      sender: "xitcoin1sender", destination: "0x3333333333333333333333333333333333333333",
+      sender: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj", destination: "0x3333333333333333333333333333333333333333",
       amount: "10", nonce: "1",
     }] : [],
     decodeTransaction: () => [{
       routeId: "route", messageIndex: 0, requestId: blockHash,
-      sender: "xitcoin1sender", destination: "0x3333333333333333333333333333333333333333",
+      sender: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj", destination: "0x3333333333333333333333333333333333333333",
       amount: "10", nonce: "1",
     }],
     fetchImpl,
@@ -143,7 +143,7 @@ test("canonical decoder reads only successful bridge_outbound_burned events", ()
     attributes: [
       { key: "request_id", value: blockHash.slice(2) },
       { key: "route_id", value: "cronos-xitcoin-xtc-v1" },
-      { key: "sender", value: "xitcoin1sender" },
+      { key: "sender", value: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj" },
       { key: "destination", value: "0x3333333333333333333333333333333333333333" },
       { key: "amount", value: "900" },
       { key: "nonce", value: "4" },
