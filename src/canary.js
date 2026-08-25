@@ -48,6 +48,9 @@ export function validateCanaryPlan(plan) {
   const cronosChainId = text(plan.cronosChainId, "Cronos chain id");
   if (cronosChainId !== "25") throw new Error("Cronos chain id must be 25");
   const xitcoinChainId = text(plan.xitcoinChainId, "Xitcoin chain id");
+  if (xitcoinChainId !== "xitcoin-testnet-1") {
+    throw new Error("Xitcoin Testnet chain id must be xitcoin-testnet-1");
+  }
   const startsAtUnix = integer(plan.startsAtUnix, "start time");
   const expiresAtUnix = integer(plan.expiresAtUnix, "expiry time");
   if (expiresAtUnix <= startsAtUnix || expiresAtUnix - startsAtUnix > 3600) throw new Error("canary window must be at most one hour");

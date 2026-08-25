@@ -41,6 +41,7 @@ test("rejects moving releases, excessive windows and noncanonical limits", () =>
   assert.throws(() => validateCanaryPlan(plan({ releaseCommit: "main" })), /immutable/);
   assert.throws(() => validateCanaryPlan(plan({ expiresAtUnix: 5000 })), /one hour/);
   assert.throws(() => validateCanaryPlan(plan({ maximumTransfers: 3 })), /exactly two/);
+  assert.throws(() => validateCanaryPlan(plan({ xitcoinChainId: "xitcoin-testnet" })), /must be xitcoin-testnet-1/);
   assert.throws(() => validateCanaryPlan(plan({ directions: ["xitcoin_to_cronos", "cronos_to_xitcoin"] })), /canonical directions/);
 });
 
