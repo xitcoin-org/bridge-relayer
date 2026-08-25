@@ -47,6 +47,7 @@ test("rejects a moving release, shared identities and embedded RPC credentials",
   shared.roles[1].identity = shared.roles[0].identity;
   assert.throws(() => validatePreflightManifest(shared), /distinct|separated/);
   assert.throws(() => validatePreflightManifest(manifest({ cronosRpcUrls: ["https://user:secret@a.example", "https://b.example"] })), /credentials/);
+  assert.throws(() => validatePreflightManifest(manifest({ xitcoinChainId: "xitcoin-testnet" })), /must be xitcoin-testnet-1/);
 });
 
 test("blocks activation when any service is active or enabled", async () => {
