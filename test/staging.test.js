@@ -17,7 +17,7 @@ const KEYS = ["01", "02", "03"].map((value) => new SigningKey(`0x${value.padStar
 const ADDRESSES = KEYS.map((key) => computeAddress(key.publicKey));
 const REQUEST = buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
   routeId: "cronos-xitcoin-xtc-v1", sourceChainId: "25", sourceRef: SOURCE_REF, nonce: "7",
-  destination: "xitcoin1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3rsflhv", amount: "10", deadlineUnix: 2_000_000_000,
+  destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "10", deadlineUnix: 2_000_000_000,
 } });
 
 function record() {
