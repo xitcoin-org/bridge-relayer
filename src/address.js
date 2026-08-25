@@ -52,7 +52,7 @@ export function bech32Encode(prefix, bytes) {
   return `${prefix}1${words.map(word => CHARSET[word]).join("")}${suffix.join("")}`;
 }
 
-export function evmAddressToBech32(address, prefix = "xitcoin") {
+export function evmAddressToBech32(address, prefix = "xtc") {
   const normalized = String(address).trim().toLowerCase();
   if (!/^0x[0-9a-f]{40}$/.test(normalized)) throw new Error("invalid EVM address");
   if (/^0x0{40}$/.test(normalized) || normalized === "0x000000000000000000000000000000000000dead") {
