@@ -32,8 +32,8 @@ the process must never select one provider silently.
 - Configure at least two independent HTTPS origins for each source chain.
 - Never place API keys, usernames or passwords inside an RPC URL. Inject secret
   headers only in a private runtime wrapper outside this public repository.
-- Pin Cronos chain ID `25` and the intended Xitcoin CometBFT chain ID before any
-  scan begins.
+- Pin Cronos chain ID `25` and the canonical Xitcoin CometBFT chain ID
+  `xitcoin-testnet-1` before any scan begins.
 - Reject catching-up Xitcoin nodes, redirects, oversized responses and malformed
   JSON instead of silently retrying a different interpretation.
 - Supply the Xitcoin outbound-message decoder from the canonical chain schema.

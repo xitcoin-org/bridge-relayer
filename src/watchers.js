@@ -46,7 +46,7 @@ export class SourceWatcher {
 }
 
 export class CronosFinalizedWatcher extends SourceWatcher {
-  constructor({ providers, vault, routeId, xitcoinPrefix = "xitcoin", confirmations = 64, maxBatch = 500 }) {
+  constructor({ providers, vault, routeId, xitcoinPrefix = "xtc", confirmations = 64, maxBatch = 500 }) {
     super();
     if (!Array.isArray(providers) || providers.length < 2) {
       throw new Error("at least two independent Cronos providers are required");

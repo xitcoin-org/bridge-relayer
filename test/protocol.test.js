@@ -6,7 +6,7 @@ import { attestationDigest, attestationId, cronosRouteId, depositId, releaseDige
 test("converts EVM account bytes to deterministic Xitcoin Bech32", () => {
   assert.equal(
     evmAddressToBech32("0x1111111111111111111111111111111111111111"),
-    "xitcoin1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3rsflhv",
+    "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9",
   );
 });
 

@@ -13,7 +13,7 @@ function manifest(overrides = {}) {
     cronosRpcUrls: ["https://cronos-a.example/rpc", "https://cronos-b.example/rpc"],
     xitcoinRpcUrls: ["https://xitcoin-a.example/rpc", "https://xitcoin-b.example/rpc"],
     cronosChainId: "25",
-    xitcoinChainId: "xitcoin-testnet",
+    xitcoinChainId: "xitcoin-testnet-1",
     ...overrides,
   };
 }
@@ -28,7 +28,7 @@ function operations(overrides = {}) {
       return { exists: true, type: wrapper ? "file" : "directory", owner: IDENTITIES[index], mode: wrapper ? 0o500 : 0o700 };
     },
     async inspectService() { return { active: false, enabled: false }; },
-    async probeNetwork(network) { return { chainId: network === "cronos" ? "25" : "xitcoin-testnet", independent: true, catchingUp: false }; },
+    async probeNetwork(network) { return { chainId: network === "cronos" ? "25" : "xitcoin-testnet-1", independent: true, catchingUp: false }; },
     ...overrides,
   };
 }

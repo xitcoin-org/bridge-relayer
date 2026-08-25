@@ -23,7 +23,7 @@ function rpcFetch(calls, overrides = {}) {
     calls.push({ path: url.pathname, search: url.search, options });
     if (overrides[url.pathname]) return overrides[url.pathname](url);
     if (url.pathname === "/status") return json({ result: {
-      node_info: { network: "xitcoin-testnet" },
+      node_info: { network: "xitcoin-testnet-1" },
       sync_info: { latest_block_height: "102", catching_up: false },
     } });
     if (url.pathname === "/block") return json({ result: {
@@ -42,15 +42,15 @@ function rpcFetch(calls, overrides = {}) {
 function client(fetchImpl = rpcFetch([])) {
   return new CometBftHttpClient({
     url: "https://rpc-a.example.test",
-    chainId: "xitcoin-testnet",
+    chainId: "xitcoin-testnet-1",
     decodeBlock: ({ height }) => height === 90 ? [{
       routeId: "route", transactionHash: txHash, messageIndex: 0, requestId: blockHash,
-      sender: "xitcoin1sender", destination: "0x3333333333333333333333333333333333333333",
+      sender: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj", destination: "0x3333333333333333333333333333333333333333",
       amount: "10", nonce: "1",
     }] : [],
     decodeTransaction: () => [{
       routeId: "route", messageIndex: 0, requestId: blockHash,
-      sender: "xitcoin1sender", destination: "0x3333333333333333333333333333333333333333",
+      sender: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj", destination: "0x3333333333333333333333333333333333333333",
       amount: "10", nonce: "1",
     }],
     fetchImpl,
@@ -82,7 +82,7 @@ test("connects only independent Cronos providers on the pinned chain", async () 
 test("CometBFT client verifies identity and produces watcher-compatible records", async () => {
   const calls = [];
   const adapter = client(rpcFetch(calls));
-  assert.deepEqual(await adapter.status(), { chainId: "xitcoin-testnet", height: 102 });
+  assert.deepEqual(await adapter.status(), { chainId: "xitcoin-testnet-1", height: 102 });
   assert.deepEqual(await adapter.block(90), { height: 90, hash: blockHash, transactionHashes: [] });
   const events = await adapter.outboundTransfers(90, 91);
   assert.equal(events.length, 1);
@@ -104,7 +104,7 @@ test("CometBFT client rejects wrong networks, oversized responses and embedded c
 
   const oversized = new CometBftHttpClient({
     url: "https://rpc-a.example.test",
-    chainId: "xitcoin-testnet",
+    chainId: "xitcoin-testnet-1",
     decodeBlock: () => [],
     decodeTransaction: () => [],
     maxResponseBytes: 10,
@@ -122,7 +122,7 @@ test("CometBFT client rejects wrong networks, oversized responses and embedded c
 
 test("Xitcoin client collection requires independent HTTPS origins", () => {
   const options = {
-    chainId: "xitcoin-testnet",
+    chainId: "xitcoin-testnet-1",
     decodeBlock: () => [],
     decodeTransaction: () => [],
     fetchImpl: rpcFetch([]),
@@ -143,7 +143,7 @@ test("canonical decoder reads only successful bridge_outbound_burned events", ()
     attributes: [
       { key: "request_id", value: blockHash.slice(2) },
       { key: "route_id", value: "cronos-xitcoin-xtc-v1" },
-      { key: "sender", value: "xitcoin1sender" },
+      { key: "sender", value: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj" },
       { key: "destination", value: "0x3333333333333333333333333333333333333333" },
       { key: "amount", value: "900" },
       { key: "nonce", value: "4" },

@@ -12,7 +12,7 @@ function plan(overrides = {}) {
     preflightDigest: "bb".repeat(32),
     routeId: "cronos-xitcoin-xtc-v1",
     cronosChainId: "25",
-    xitcoinChainId: "xitcoin-testnet",
+    xitcoinChainId: "xitcoin-testnet-1",
     startsAtUnix: 1000,
     expiresAtUnix: 1600,
     maximumTransfers: 2,

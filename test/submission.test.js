@@ -28,11 +28,11 @@ function approvedStore(request) {
 
 const inbound = buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
   routeId: "cronos-xitcoin-xtc-v1", sourceChainId: "25", sourceRef: ref, nonce: "7",
-  destination: "xitcoin1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3rsflhv", amount: "10", deadlineUnix: 2_000_000_000,
+  destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "10", deadlineUnix: 2_000_000_000,
 } });
 
 test("builds the exact Xitcoin attestation submission", () => {
-  const message = buildXitcoinSubmission({ request: inbound, approvals: approvals(inbound), submitter: "xitcoin1submitter" });
+  const message = buildXitcoinSubmission({ request: inbound, approvals: approvals(inbound), submitter: "xtc1xvenxvenxvenxvenxvenxvenxvenxvenhqlh4q" });
   assert.equal(message.direction, DIRECTION_INBOUND);
   assert.equal(message.nonce, "7");
   assert.equal(message.signatures.length, 2);

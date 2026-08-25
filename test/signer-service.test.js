@@ -12,7 +12,7 @@ const ADDRESS = computeAddress(KEY.publicKey);
 const VAULT = "0x1111111111111111111111111111111111111111";
 
 function inbound(overrides = {}) {
-  return buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: { routeId: "cronos-xitcoin-xtc-v1", sourceChainId: "25", sourceRef: `0x${"aa".repeat(32)}`, nonce: "7", destination: "xitcoin1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3rsflhv", amount: "1000000000000000000", deadlineUnix: 1_900_000_300, ...overrides } });
+  return buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: { routeId: "cronos-xitcoin-xtc-v1", sourceChainId: "25", sourceRef: `0x${"aa".repeat(32)}`, nonce: "7", destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "1000000000000000000", deadlineUnix: 1_900_000_300, ...overrides } });
 }
 
 function outbound(overrides = {}) {
