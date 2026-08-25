@@ -55,7 +55,7 @@ test("Cronos watcher accepts only an agreed and finalized canonical deposit", as
   assert.equal(record.payload.depositId, depositId);
   assert.equal(record.payload.amount, "500");
   assert.equal(record.payload.nonce, "7");
-  assert.match(record.payload.destination, /^xitcoin1/);
+  assert.match(record.payload.destination, /^xtc1/);
   assert.equal(await watcher.verifyCanonicalEvent(record), true);
 });
 
@@ -78,7 +78,7 @@ const outbound = {
   transactionHash: txHash,
   messageIndex: 0,
   requestId: depositId,
-  sender: "xitcoin1sender",
+  sender: "xtc1yg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3z97g2qj",
   destination: recipient,
   amount: "900",
   nonce: "4",
