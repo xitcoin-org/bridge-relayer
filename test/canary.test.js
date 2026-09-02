@@ -10,8 +10,8 @@ function plan(overrides = {}) {
     releaseCommit: "4e72eda2b64b448bff07e90fc12cda51513d5064",
     decisionId: "aa".repeat(32),
     preflightDigest: "bb".repeat(32),
-    routeId: "cronos-xitcoin-xtc-v1",
-    cronosChainId: "25",
+    routeId: "cronos-testnet-xitcoin-testnet",
+    cronosChainId: "338",
     xitcoinChainId: "xitcoin-testnet-v2-1",
     startsAtUnix: 1000,
     expiresAtUnix: 1600,
@@ -41,6 +41,8 @@ test("rejects moving releases, excessive windows and noncanonical limits", () =>
   assert.throws(() => validateCanaryPlan(plan({ releaseCommit: "main" })), /immutable/);
   assert.throws(() => validateCanaryPlan(plan({ expiresAtUnix: 5000 })), /one hour/);
   assert.throws(() => validateCanaryPlan(plan({ maximumTransfers: 3 })), /exactly two/);
+  assert.throws(() => validateCanaryPlan(plan({ cronosChainId: "25" })), /must be 338/);
+  assert.throws(() => validateCanaryPlan(plan({ routeId: "cronos-xitcoin-xtc-v1" })), /not canonical/);
   assert.throws(() => validateCanaryPlan(plan({ xitcoinChainId: "xitcoin-testnet-1" })), /must be xitcoin-testnet-v2-1/);
   assert.throws(() => validateCanaryPlan(plan({ directions: ["xitcoin_to_cronos", "cronos_to_xitcoin"] })), /canonical directions/);
 });
