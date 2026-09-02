@@ -16,6 +16,11 @@ authorization to activate the bridge.
 - Verify Cronos EVM Testnet chain ID `338` and the canonical Xitcoin Testnet
   Chain ID `xitcoin-testnet-v2-1` through independent healthy RPC origins.
   Cronos mainnet chain ID `25` must fail this testnet preflight.
+- Bind the manifest to the deployed Cronos test token and vault, the canonical
+  route label and derived route ID, the exact ordered signer set, the separate
+  guardian, signer-set version `1`, and the configured release limits.
+- Read the vault state independently from Cronos testnet and require deployed
+  bytecode plus `paused=true`. Resumption is a later 2-of-3 controlled action.
 - Preserve only the sanitized pass/fail report and its SHA-256 digest.
 
 ## Blocking conditions
