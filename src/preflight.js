@@ -60,8 +60,8 @@ export function validatePreflightManifest(manifest) {
   const cronosChainId = text(manifest.cronosChainId, "Cronos chain id");
   if (cronosChainId !== "25") throw new Error("Cronos chain id must be 25");
   const xitcoinChainId = text(manifest.xitcoinChainId, "Xitcoin chain id");
-  if (xitcoinChainId !== "xitcoin-testnet-1") {
-    throw new Error("Xitcoin Testnet chain id must be xitcoin-testnet-1");
+  if (xitcoinChainId !== "xitcoin-testnet-v2-1") {
+    throw new Error("Xitcoin Testnet chain id must be xitcoin-testnet-v2-1");
   }
   return Object.freeze({ releaseCommit, roles: Object.freeze(roles), topology, cronosChainId, xitcoinChainId });
 }

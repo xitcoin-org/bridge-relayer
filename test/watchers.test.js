@@ -86,7 +86,7 @@ const outbound = {
 
 function xitcoinClient(overrides = {}) {
   return {
-    async status() { return { chainId: "xitcoin-testnet-1", height: 100 }; },
+    async status() { return { chainId: "xitcoin-testnet-v2-1", height: 100 }; },
     async block(height) { return { height, hash: blockHash }; },
     async outboundTransfers() { return [outbound]; },
     async outboundTransfer() { return outbound; },
@@ -97,7 +97,7 @@ function xitcoinClient(overrides = {}) {
 test("Xitcoin watcher requires matching finalized messages from independent clients", async () => {
   const watcher = new XitcoinFinalizedWatcher({
     clients: [xitcoinClient(), xitcoinClient()],
-    chainId: "xitcoin-testnet-1",
+    chainId: "xitcoin-testnet-v2-1",
     routeId: outbound.routeId,
     safetyLag: 2,
   });
@@ -111,13 +111,13 @@ test("Xitcoin watcher requires matching finalized messages from independent clie
 test("Xitcoin watcher stops on chain identity and event disagreement", async () => {
   const wrongChain = xitcoinClient({ async status() { return { chainId: "wrong", height: 100 }; } });
   const identityWatcher = new XitcoinFinalizedWatcher({
-    clients: [wrongChain, wrongChain], chainId: "xitcoin-testnet-1", routeId: outbound.routeId,
+    clients: [wrongChain, wrongChain], chainId: "xitcoin-testnet-v2-1", routeId: outbound.routeId,
   });
   await assert.rejects(() => identityWatcher.latestFinalizedHeight(), FinalityViolation);
 
   const changed = xitcoinClient({ async outboundTransfers() { return [{ ...outbound, amount: "901" }]; } });
   const disagreementWatcher = new XitcoinFinalizedWatcher({
-    clients: [xitcoinClient(), changed], chainId: "xitcoin-testnet-1", routeId: outbound.routeId,
+    clients: [xitcoinClient(), changed], chainId: "xitcoin-testnet-v2-1", routeId: outbound.routeId,
   });
   await assert.rejects(() => disagreementWatcher.events(90, 90), /RPC disagreement/);
 });
