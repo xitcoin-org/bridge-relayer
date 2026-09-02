@@ -44,9 +44,9 @@ export function validateCanaryPlan(plan) {
   const decisionId = digest(plan.decisionId, "decision id");
   const preflightDigest = digest(plan.preflightDigest, "preflight digest");
   const routeId = text(plan.routeId, "route id");
-  if (routeId !== "cronos-xitcoin-xtc-v1") throw new Error("canary route is not canonical");
+  if (routeId !== "cronos-testnet-xitcoin-testnet") throw new Error("testnet canary route is not canonical");
   const cronosChainId = text(plan.cronosChainId, "Cronos chain id");
-  if (cronosChainId !== "25") throw new Error("Cronos chain id must be 25");
+  if (cronosChainId !== "338") throw new Error("Cronos Testnet chain id must be 338");
   const xitcoinChainId = text(plan.xitcoinChainId, "Xitcoin chain id");
   if (xitcoinChainId !== "xitcoin-testnet-v2-1") {
     throw new Error("Xitcoin Testnet chain id must be xitcoin-testnet-v2-1");
