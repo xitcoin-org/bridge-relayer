@@ -9,8 +9,12 @@ does not load keys, start services or broadcast transactions.
 - Pin a complete release commit and the successful preflight report digest.
 - Use a SHA-256 decision identifier without personal or secret information.
 - Limit authorization to one hour or less.
-- Permit exactly two very small transfers: Cronos to Xitcoin, then Xitcoin to
-  Cronos. The amount ceiling must be approved before the window opens.
+- Pin the isolated route to `cronos-testnet-xitcoin-testnet`, Cronos EVM
+  Testnet chain ID `338` and Xitcoin chain ID `xitcoin-testnet-v2-1`. The
+  production route and Cronos chain ID `25` are invalid in this testnet plan.
+- Permit exactly two very small transfers using test-only assets: Cronos
+  Testnet to Xitcoin Testnet, then Xitcoin Testnet to Cronos Testnet. The
+  amount ceiling must be approved before the window opens.
 - Keep services disabled until the separate operational authorization.
 
 ## Immediate stop conditions

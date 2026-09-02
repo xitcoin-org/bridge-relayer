@@ -12,7 +12,7 @@ function manifest(overrides = {}) {
     roles: NAMES.map((name, index) => ({ name, identity: IDENTITIES[index], stateDirectory: `/var/lib/xitcoin-bridge/${name}`, wrapper: `/opt/xitcoin-bridge-runtime/${name}.mjs` })),
     cronosRpcUrls: ["https://cronos-a.example/rpc", "https://cronos-b.example/rpc"],
     xitcoinRpcUrls: ["https://xitcoin-a.example/rpc", "https://xitcoin-b.example/rpc"],
-    cronosChainId: "25",
+    cronosChainId: "338",
     xitcoinChainId: "xitcoin-testnet-v2-1",
     ...overrides,
   };
@@ -28,7 +28,7 @@ function operations(overrides = {}) {
       return { exists: true, type: wrapper ? "file" : "directory", owner: IDENTITIES[index], mode: wrapper ? 0o500 : 0o700 };
     },
     async inspectService() { return { active: false, enabled: false }; },
-    async probeNetwork(network) { return { chainId: network === "cronos" ? "25" : "xitcoin-testnet-v2-1", independent: true, catchingUp: false }; },
+    async probeNetwork(network) { return { chainId: network === "cronos" ? "338" : "xitcoin-testnet-v2-1", independent: true, catchingUp: false }; },
     ...overrides,
   };
 }
@@ -47,6 +47,7 @@ test("rejects a moving release, shared identities and embedded RPC credentials",
   shared.roles[1].identity = shared.roles[0].identity;
   assert.throws(() => validatePreflightManifest(shared), /distinct|separated/);
   assert.throws(() => validatePreflightManifest(manifest({ cronosRpcUrls: ["https://user:secret@a.example", "https://b.example"] })), /credentials/);
+  assert.throws(() => validatePreflightManifest(manifest({ cronosChainId: "25" })), /must be 338/);
   assert.throws(() => validatePreflightManifest(manifest({ xitcoinChainId: "xitcoin-testnet-1" })), /must be xitcoin-testnet-v2-1/);
 });
 

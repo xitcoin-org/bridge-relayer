@@ -41,7 +41,9 @@ with in-memory adapters to rehearse one-signer loss, RPC disagreement, crash
 recovery and duplicate-broadcast prevention without contacting a network.
 The testnet preflight validates a commit-pinned release, separated locked
 identities, private paths, disabled services and independently verified chain
-identities before any canary is authorized.
+identities before any canary is authorized. It pins Cronos EVM Testnet chain ID
+`338`, Xitcoin chain ID `xitcoin-testnet-v2-1` and rejects Cronos mainnet chain
+ID `25`.
 The controlled-canary plan binds a short authorization window to the release
 and preflight digests, permits exactly one bounded transfer in each direction,
 stops on any safety violation and emits only sanitized transaction evidence.
