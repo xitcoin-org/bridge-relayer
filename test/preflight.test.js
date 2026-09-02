@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { TestnetPreflight, validatePreflightManifest } from "../src/preflight.js";
+import { TESTNET_ROUTE_ID, TESTNET_ROUTE_LABEL, TestnetPreflight, validatePreflightManifest } from "../src/preflight.js";
 
 const IDENTITIES = ["bridge-coordinator", "bridge-signer-1", "bridge-signer-2", "bridge-signer-3", "bridge-submitter-xitcoin", "bridge-submitter-cronos"];
 const NAMES = ["coordinator", "signer-1", "signer-2", "signer-3", "submitter-xitcoin", "submitter-cronos"];
@@ -14,6 +14,18 @@ function manifest(overrides = {}) {
     xitcoinRpcUrls: ["https://xitcoin-a.example/rpc", "https://xitcoin-b.example/rpc"],
     cronosChainId: "338",
     xitcoinChainId: "xitcoin-testnet-v2-1",
+    cronosRouteLabel: TESTNET_ROUTE_LABEL,
+    cronosRouteId: TESTNET_ROUTE_ID,
+    cronosAssetAddress: "0x1111111111111111111111111111111111111111",
+    cronosVaultAddress: "0x2222222222222222222222222222222222222222",
+    cronosSignerAddresses: [
+      "0x3333333333333333333333333333333333333333",
+      "0x4444444444444444444444444444444444444444",
+      "0x5555555555555555555555555555555555555555",
+    ],
+    cronosGuardianAddress: "0x6666666666666666666666666666666666666666",
+    cronosMaxReleaseAmount: "100000000000000000000",
+    cronosDailyReleaseLimit: "500000000000000000000",
     ...overrides,
   };
 }
@@ -28,7 +40,27 @@ function operations(overrides = {}) {
       return { exists: true, type: wrapper ? "file" : "directory", owner: IDENTITIES[index], mode: wrapper ? 0o500 : 0o700 };
     },
     async inspectService() { return { active: false, enabled: false }; },
-    async probeNetwork(network) { return { chainId: network === "cronos" ? "338" : "xitcoin-testnet-v2-1", independent: true, catchingUp: false }; },
+    async probeNetwork(network) { return {
+      chainId: network === "cronos" ? "338" : "xitcoin-testnet-v2-1",
+      independent: true,
+      catchingUp: false,
+      vault: network === "cronos" ? {
+        codePresent: true,
+        paused: true,
+        signerSetVersion: "1",
+        address: "0x2222222222222222222222222222222222222222",
+        asset: "0x1111111111111111111111111111111111111111",
+        routeId: TESTNET_ROUTE_ID,
+        signers: [
+          "0x3333333333333333333333333333333333333333",
+          "0x4444444444444444444444444444444444444444",
+          "0x5555555555555555555555555555555555555555",
+        ],
+        guardian: "0x6666666666666666666666666666666666666666",
+        maxReleaseAmount: "100000000000000000000",
+        dailyReleaseLimit: "500000000000000000000",
+      } : undefined,
+    }; },
     ...overrides,
   };
 }
@@ -36,7 +68,7 @@ function operations(overrides = {}) {
 test("accepts a pinned, separated and inactive testnet topology", async () => {
   const report = await new TestnetPreflight({ manifest: manifest(), ...operations() }).run();
   assert.equal(report.passed, true);
-  assert.equal(report.checks.length, 26);
+  assert.equal(report.checks.length, 27);
   assert.match(report.reportDigest, /^[0-9a-f]{64}$/);
   assert.equal(JSON.stringify(report).includes("https://"), false);
 });
@@ -49,6 +81,19 @@ test("rejects a moving release, shared identities and embedded RPC credentials",
   assert.throws(() => validatePreflightManifest(manifest({ cronosRpcUrls: ["https://user:secret@a.example", "https://b.example"] })), /credentials/);
   assert.throws(() => validatePreflightManifest(manifest({ cronosChainId: "25" })), /must be 338/);
   assert.throws(() => validatePreflightManifest(manifest({ xitcoinChainId: "xitcoin-testnet-1" })), /must be xitcoin-testnet-v2-1/);
+  assert.throws(() => validatePreflightManifest(manifest({ cronosRouteId: "0x" + "00".repeat(32) })), /route id/);
+  assert.throws(() => validatePreflightManifest(manifest({ cronosGuardianAddress: "0x3333333333333333333333333333333333333333" })), /separate/);
+});
+
+test("requires the deployed Cronos vault to match and remain paused", async () => {
+  const report = await new TestnetPreflight({ manifest: manifest(), ...operations({
+    async probeNetwork(network) {
+      const result = await operations().probeNetwork(network);
+      return network === "cronos" ? { ...result, vault: { ...result.vault, paused: false } } : result;
+    },
+  }) }).run();
+  assert.equal(report.passed, false);
+  assert.equal(report.failureCode, "cronos_vault_configuration_invalid");
 });
 
 test("blocks activation when any service is active or enabled", async () => {

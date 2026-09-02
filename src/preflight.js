@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getAddress, id, ZeroAddress } from "ethers";
 
 import { validateRuntimeTopology } from "./runtime.js";
 
@@ -12,6 +13,9 @@ const REQUIRED_ROLES = Object.freeze([
   "submitter-xitcoin",
   "submitter-cronos",
 ]);
+export const TESTNET_ROUTE_LABEL = "XTC:CRONOS-TESTNET:338:XITCOIN-TESTNET-V2-1";
+export const TESTNET_ROUTE_ID = id(TESTNET_ROUTE_LABEL);
+const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
 
 function text(value, label) {
   const result = String(value ?? "").trim();
@@ -24,6 +28,25 @@ function absolutePath(value, label) {
   if (!result.startsWith("/") || result.includes("/../") || result.endsWith("/..")) {
     throw new Error(`${label} must be an absolute normalized path`);
   }
+  return result;
+}
+
+function evmAddress(value, label) {
+  let result;
+  try {
+    result = getAddress(text(value, label));
+  } catch {
+    throw new Error(`${label} must be a valid EVM address`);
+  }
+  if (result === ZeroAddress || result.toLowerCase() === DEAD_ADDRESS.toLowerCase()) {
+    throw new Error(`${label} must not be zero or dead`);
+  }
+  return result;
+}
+
+function positiveInteger(value, label) {
+  const result = text(value, label);
+  if (!/^[1-9][0-9]*$/.test(result)) throw new Error(`${label} must be a positive integer`);
   return result;
 }
 
@@ -63,7 +86,34 @@ export function validatePreflightManifest(manifest) {
   if (xitcoinChainId !== "xitcoin-testnet-v2-1") {
     throw new Error("Xitcoin Testnet chain id must be xitcoin-testnet-v2-1");
   }
-  return Object.freeze({ releaseCommit, roles: Object.freeze(roles), topology, cronosChainId, xitcoinChainId });
+  const cronosRouteLabel = text(manifest.cronosRouteLabel, "Cronos route label");
+  if (cronosRouteLabel !== TESTNET_ROUTE_LABEL) throw new Error("Cronos testnet route label is not canonical");
+  const cronosRouteId = text(manifest.cronosRouteId, "Cronos route id").toLowerCase();
+  if (cronosRouteId !== TESTNET_ROUTE_ID.toLowerCase()) throw new Error("Cronos testnet route id is not canonical");
+  const cronosAssetAddress = evmAddress(manifest.cronosAssetAddress, "Cronos test asset");
+  const cronosVaultAddress = evmAddress(manifest.cronosVaultAddress, "Cronos vault");
+  if (cronosAssetAddress === cronosVaultAddress) throw new Error("Cronos asset and vault must be distinct");
+  if (!Array.isArray(manifest.cronosSignerAddresses) || manifest.cronosSignerAddresses.length !== 3) {
+    throw new Error("exactly three Cronos signer addresses are required");
+  }
+  const cronosSignerAddresses = manifest.cronosSignerAddresses.map((value, index) =>
+    evmAddress(value, `Cronos signer ${index + 1}`));
+  if (new Set(cronosSignerAddresses.map((value) => value.toLowerCase())).size !== 3) {
+    throw new Error("Cronos signer addresses must be distinct");
+  }
+  const cronosGuardianAddress = evmAddress(manifest.cronosGuardianAddress, "Cronos guardian");
+  if (cronosSignerAddresses.some((value) => value.toLowerCase() === cronosGuardianAddress.toLowerCase())) {
+    throw new Error("Cronos guardian must be separate from signers");
+  }
+  const cronosMaxReleaseAmount = positiveInteger(manifest.cronosMaxReleaseAmount, "Cronos maximum release amount");
+  const cronosDailyReleaseLimit = positiveInteger(manifest.cronosDailyReleaseLimit, "Cronos daily release limit");
+  if (BigInt(cronosMaxReleaseAmount) > BigInt(cronosDailyReleaseLimit)) {
+    throw new Error("Cronos maximum release amount must not exceed daily limit");
+  }
+  return Object.freeze({ releaseCommit, roles: Object.freeze(roles), topology, cronosChainId, xitcoinChainId,
+    cronosRouteLabel, cronosRouteId, cronosAssetAddress, cronosVaultAddress,
+    cronosSignerAddresses: Object.freeze(cronosSignerAddresses), cronosGuardianAddress,
+    cronosMaxReleaseAmount, cronosDailyReleaseLimit });
 }
 
 function safeMode(value, maximum, label) {
@@ -110,6 +160,23 @@ export class TestnetPreflight {
         const probe = await this.probeNetwork(network);
         if (!probe?.independent || probe.chainId !== expected || probe.catchingUp === true) throw new Error("network_identity_invalid");
         checks.push(`${network}:identity`);
+        if (network === "cronos") {
+          const vault = probe.vault;
+          const expectedSigners = this.manifest.cronosSignerAddresses.map((value) => value.toLowerCase());
+          const actualSigners = Array.isArray(vault?.signers)
+            ? vault.signers.map((value) => String(value).toLowerCase()) : [];
+          if (!vault?.codePresent || vault.paused !== true || String(vault.signerSetVersion) !== "1" ||
+              String(vault.address).toLowerCase() !== this.manifest.cronosVaultAddress.toLowerCase() ||
+              String(vault.asset).toLowerCase() !== this.manifest.cronosAssetAddress.toLowerCase() ||
+              String(vault.routeId).toLowerCase() !== this.manifest.cronosRouteId ||
+              String(vault.guardian).toLowerCase() !== this.manifest.cronosGuardianAddress.toLowerCase() ||
+              String(vault.maxReleaseAmount) !== this.manifest.cronosMaxReleaseAmount ||
+              String(vault.dailyReleaseLimit) !== this.manifest.cronosDailyReleaseLimit ||
+              actualSigners.length !== 3 || actualSigners.some((value, index) => value !== expectedSigners[index])) {
+            throw new Error("cronos_vault_configuration_invalid");
+          }
+          checks.push("cronos:vault_paused");
+        }
       }
     } catch (error) {
       return this.#report(false, checks, String(error?.message ?? "preflight_failed"));
