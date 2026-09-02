@@ -14,7 +14,7 @@ authorization to activate the bridge.
   by that role with mode `0700` or stricter.
 - Confirm every bridge service is both inactive and disabled.
 - Verify Cronos chain ID `25` and the canonical Xitcoin Testnet Chain ID
-  `xitcoin-testnet-1` through independent healthy RPC origins.
+  `xitcoin-testnet-v2-1` through independent healthy RPC origins.
 - Preserve only the sanitized pass/fail report and its SHA-256 digest.
 
 ## Blocking conditions

@@ -12,7 +12,7 @@ function plan(overrides = {}) {
     preflightDigest: "bb".repeat(32),
     routeId: "cronos-xitcoin-xtc-v1",
     cronosChainId: "25",
-    xitcoinChainId: "xitcoin-testnet-1",
+    xitcoinChainId: "xitcoin-testnet-v2-1",
     startsAtUnix: 1000,
     expiresAtUnix: 1600,
     maximumTransfers: 2,
@@ -41,7 +41,7 @@ test("rejects moving releases, excessive windows and noncanonical limits", () =>
   assert.throws(() => validateCanaryPlan(plan({ releaseCommit: "main" })), /immutable/);
   assert.throws(() => validateCanaryPlan(plan({ expiresAtUnix: 5000 })), /one hour/);
   assert.throws(() => validateCanaryPlan(plan({ maximumTransfers: 3 })), /exactly two/);
-  assert.throws(() => validateCanaryPlan(plan({ xitcoinChainId: "xitcoin-testnet" })), /must be xitcoin-testnet-1/);
+  assert.throws(() => validateCanaryPlan(plan({ xitcoinChainId: "xitcoin-testnet-1" })), /must be xitcoin-testnet-v2-1/);
   assert.throws(() => validateCanaryPlan(plan({ directions: ["xitcoin_to_cronos", "cronos_to_xitcoin"] })), /canonical directions/);
 });
 
