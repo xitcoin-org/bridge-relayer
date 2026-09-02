@@ -58,7 +58,7 @@ export function validatePreflightManifest(manifest) {
     xitcoinRpcUrls: manifest.xitcoinRpcUrls,
   });
   const cronosChainId = text(manifest.cronosChainId, "Cronos chain id");
-  if (cronosChainId !== "25") throw new Error("Cronos chain id must be 25");
+  if (cronosChainId !== "338") throw new Error("Cronos Testnet chain id must be 338");
   const xitcoinChainId = text(manifest.xitcoinChainId, "Xitcoin chain id");
   if (xitcoinChainId !== "xitcoin-testnet-v2-1") {
     throw new Error("Xitcoin Testnet chain id must be xitcoin-testnet-v2-1");
