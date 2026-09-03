@@ -45,6 +45,7 @@ export function authorizeSignerRequest({ request, policy, nowUnix = Math.floor(D
     if (!policy.routes.has(validateRouteId(canonical.payload.routeId))) throw new Error("route is not authorized");
     if (!policy.chains.has(positiveInteger(canonical.payload.sourceChainId, "source chain ID"))) throw new Error("source chain is not authorized");
   } else if (canonical.direction === DIRECTION_OUTBOUND) {
+    if (!policy.routes.has(validateRouteId(canonical.payload.routeId))) throw new Error("route is not authorized");
     if (!policy.chains.has(positiveInteger(canonical.payload.chainId, "destination chain ID"))) throw new Error("destination chain is not authorized");
     if (!policy.vaults.has(getAddress(canonical.payload.vault).toLowerCase())) throw new Error("destination vault is not authorized");
   } else {
