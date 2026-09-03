@@ -19,7 +19,7 @@ const VAULT_ABI = Object.freeze([
   "function asset() view returns (address)",
   "function guardian() view returns (address)",
   "function signerSetVersion() view returns (uint256)",
-  "function signers() view returns (address[])",
+  "function signers() view returns (address[3])",
   "function maxReleaseAmount() view returns (uint256)",
   "function dailyReleaseLimit() view returns (uint256)",
 ]);
