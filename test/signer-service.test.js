@@ -16,7 +16,7 @@ function inbound(overrides = {}) {
 }
 
 function outbound(overrides = {}) {
-  return buildApprovalRequest({ direction: DIRECTION_OUTBOUND, payload: { chainId: 25, vault: VAULT, sourceBurnId: `0x${"bb".repeat(32)}`, recipient: "0x2222222222222222222222222222222222222222", amount: "1000000000000000000", signerSetVersion: 4, deadline: 1_900_000_300, ...overrides } });
+  return buildApprovalRequest({ direction: DIRECTION_OUTBOUND, payload: { routeId: "cronos-xitcoin-xtc-v1", chainId: 25, vault: VAULT, sourceBurnId: `0x${"bb".repeat(32)}`, recipient: "0x2222222222222222222222222222222222222222", amount: "1000000000000000000", signerSetVersion: 4, deadline: 1_900_000_300, ...overrides } });
 }
 
 function policy() {
@@ -29,6 +29,7 @@ test("authorizes only the pinned route, chain, vault, amount and deadline", () =
   assert.throws(() => authorizeSignerRequest({ request: inbound({ routeId: "other-route" }), policy: policy(), nowUnix: 1_900_000_000 }), /route/);
   assert.throws(() => authorizeSignerRequest({ request: inbound({ amount: "3000000000000000000" }), policy: policy(), nowUnix: 1_900_000_000 }), /amount/);
   assert.throws(() => authorizeSignerRequest({ request: outbound({ vault: "0x3333333333333333333333333333333333333333" }), policy: policy(), nowUnix: 1_900_000_000 }), /vault/);
+  assert.throws(() => authorizeSignerRequest({ request: outbound({ routeId: "other-route" }), policy: policy(), nowUnix: 1_900_000_000 }), /route/);
   assert.throws(() => authorizeSignerRequest({ request: inbound({ deadlineUnix: 1_900_001_000 }), policy: policy(), nowUnix: 1_900_000_000 }), /deadline/);
 });
 
