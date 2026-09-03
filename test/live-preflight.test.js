@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createHostInspectors, createLiveNetworkProbe } from "../src/live-preflight.js";
+import { VAULT_ABI, createHostInspectors, createLiveNetworkProbe } from "../src/live-preflight.js";
 
 const manifest = Object.freeze({
   cronosChainId: "338",
@@ -9,6 +9,15 @@ const manifest = Object.freeze({
   cronosRpcUrls: ["https://cronos-a.invalid", "https://cronos-b.invalid"],
   xitcoinRpcUrls: ["https://xitcoin-a.invalid", "https://xitcoin-b.invalid"],
   cronosVaultAddress: "0x1c94273C0b199b139D82da3786C9eCbE189D5919",
+});
+
+test("Cronos vault ABI decodes the canonical fixed signer array", () => {
+  assert.ok(
+    VAULT_ABI.includes("function signers() view returns (address[3])"),
+  );
+  assert.ok(
+    !VAULT_ABI.includes("function signers() view returns (address[])"),
+  );
 });
 
 function vaultSnapshot(overrides = {}) {
