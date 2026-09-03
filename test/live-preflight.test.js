@@ -71,3 +71,16 @@ test("live network probe checks both Xitcoin RPC clients", async () => {
   assert.equal(result.independent, true);
   assert.equal(seen.length, 2);
 });
+
+test("live network probe forwards the explicit loopback-only transport policy", async () => {
+  const configured = { ...manifest, allowLoopbackHttp: true, xitcoinRpcUrls: ["http://127.0.0.1:41657", "http://127.0.0.1:42657"] };
+  const options = [];
+  const probe = createLiveNetworkProbe(configured, {
+    xitcoinClientFactory: (url) => {
+      options.push(url);
+      return { status: async () => ({ chainId: "xitcoin-testnet-v2-1", height: 100 }) };
+    },
+  });
+  await probe("xitcoin");
+  assert.deepEqual(options, configured.xitcoinRpcUrls);
+});

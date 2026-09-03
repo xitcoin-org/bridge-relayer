@@ -46,3 +46,8 @@ Run it only with Node `24.19.0`. The command reads no keystore, creates no
 signature, installs no unit and exposes no transaction-submission operation. It
 returns a sanitized JSON report and exits non-zero on any failed check or RPC
 disagreement. Keep private RPC URLs in the external manifest, never in Git.
+
+`allowLoopbackHttp: true` may be used only for loopback listeners such as two
+local ports backed by separate encrypted SSH tunnels. Remote plaintext HTTP is
+always rejected. This permits validators to keep CometBFT RPC bound to
+`127.0.0.1` and firewalled instead of exposing it publicly.

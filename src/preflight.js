@@ -79,6 +79,7 @@ export function validatePreflightManifest(manifest) {
     submitterIdentities: identities.slice(4),
     cronosRpcUrls: manifest.cronosRpcUrls,
     xitcoinRpcUrls: manifest.xitcoinRpcUrls,
+    allowLoopbackHttp: manifest.allowLoopbackHttp === true,
   });
   const cronosChainId = text(manifest.cronosChainId, "Cronos chain id");
   if (cronosChainId !== "338") throw new Error("Cronos Testnet chain id must be 338");

@@ -19,11 +19,14 @@ function identities(values, expected, label) {
   return normalized;
 }
 
-function independentOrigins(values, label) {
+function independentOrigins(values, label, { allowLoopbackHttp = false } = {}) {
   if (!Array.isArray(values) || values.length < 2) throw new Error(`at least two ${label} origins are required`);
   const origins = values.map((value) => {
     const url = new URL(value);
-    if (url.protocol !== "https:") throw new Error(`${label} origins must use HTTPS`);
+    const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
+    if (url.protocol !== "https:" && !(allowLoopbackHttp && loopback && url.protocol === "http:")) {
+      throw new Error(`${label} origins must use HTTPS or explicitly authorized loopback HTTP`);
+    }
     if (url.username || url.password) throw new Error(`${label} credentials must not be embedded in URLs`);
     return url.origin;
   });
@@ -31,7 +34,8 @@ function independentOrigins(values, label) {
   return origins;
 }
 
-export function validateRuntimeTopology({ coordinatorIdentity, signerIdentities, submitterIdentities, cronosRpcUrls, xitcoinRpcUrls }) {
+export function validateRuntimeTopology({ coordinatorIdentity, signerIdentities, submitterIdentities, cronosRpcUrls, xitcoinRpcUrls, allowLoopbackHttp = false }) {
+  if (typeof allowLoopbackHttp !== "boolean") throw new Error("loopback HTTP policy must be boolean");
   const coordinator = nonEmpty(coordinatorIdentity, "coordinator identity");
   const signers = identities(signerIdentities, 3, "signer identities");
   const submitters = identities(submitterIdentities, 2, "submitter identities");
@@ -41,8 +45,9 @@ export function validateRuntimeTopology({ coordinatorIdentity, signerIdentities,
     coordinatorIdentity: coordinator,
     signerIdentities: Object.freeze(signers),
     submitterIdentities: Object.freeze(submitters),
-    cronosRpcOrigins: Object.freeze(independentOrigins(cronosRpcUrls, "Cronos RPC")),
-    xitcoinRpcOrigins: Object.freeze(independentOrigins(xitcoinRpcUrls, "Xitcoin RPC")),
+    cronosRpcOrigins: Object.freeze(independentOrigins(cronosRpcUrls, "Cronos RPC", { allowLoopbackHttp })),
+    xitcoinRpcOrigins: Object.freeze(independentOrigins(xitcoinRpcUrls, "Xitcoin RPC", { allowLoopbackHttp })),
+    allowLoopbackHttp,
   });
 }
 

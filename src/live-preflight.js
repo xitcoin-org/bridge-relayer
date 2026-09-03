@@ -124,11 +124,16 @@ export function createLiveNetworkProbe(manifest, {
     chainId: manifest.xitcoinChainId,
     decodeBlock: decodeXitcoinOutboundBlock,
     decodeTransaction: decodeXitcoinOutboundTransaction,
+    allowHttp: manifest.allowLoopbackHttp === true,
   }),
 } = {}) {
   return async function probeNetwork(network) {
     if (network === "cronos") {
-      const providers = await connectCronos({ urls: manifest.cronosRpcUrls, chainId: Number(manifest.cronosChainId) });
+      const providers = await connectCronos({
+        urls: manifest.cronosRpcUrls,
+        chainId: Number(manifest.cronosChainId),
+        allowHttp: manifest.allowLoopbackHttp === true,
+      });
       const snapshots = await Promise.all(providers.map((provider) =>
         readVault(provider, manifest.cronosVaultAddress, contractFactory)));
       if (new Set(snapshots.map(canonical)).size !== 1) throw new Error("Cronos RPC disagreement");

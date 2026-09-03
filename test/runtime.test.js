@@ -12,6 +12,14 @@ test("requires separated runtime identities and independent HTTPS RPC origins", 
   assert.throws(() => validateRuntimeTopology({ coordinatorIdentity: "coordinator", signerIdentities: ["one", "two", "three"], submitterIdentities: ["four", "five"], cronosRpcUrls: ["https://user:secret@a.example", "https://b.example"], xitcoinRpcUrls: ["https://c.example", "https://d.example"] }), /credentials/);
 });
 
+test("permits explicitly authorized loopback HTTP but never remote HTTP", () => {
+  const base = { coordinatorIdentity: "coordinator", signerIdentities: ["signer-1", "signer-2", "signer-3"], submitterIdentities: ["submitter-xitcoin", "submitter-cronos"], cronosRpcUrls: ["https://cronos-a.example", "https://cronos-b.example"] };
+  const topology = validateRuntimeTopology({ ...base, xitcoinRpcUrls: ["http://127.0.0.1:41657", "http://127.0.0.1:42657"], allowLoopbackHttp: true });
+  assert.equal(topology.allowLoopbackHttp, true);
+  assert.throws(() => validateRuntimeTopology({ ...base, xitcoinRpcUrls: ["http://127.0.0.1:41657", "http://127.0.0.1:42657"] }), /explicitly authorized/);
+  assert.throws(() => validateRuntimeTopology({ ...base, xitcoinRpcUrls: ["http://10.0.0.2:41657", "http://127.0.0.1:42657"], allowLoopbackHttp: true }), /explicitly authorized/);
+});
+
 test("supervisor reports readiness only after every worker succeeds", async () => {
   let now = 1000;
   const health = new RuntimeHealth({ workers: ["watchers", "approvals", "submissions"], staleAfterSeconds: 30, now: () => now });
