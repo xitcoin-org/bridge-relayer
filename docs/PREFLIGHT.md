@@ -32,3 +32,17 @@ blocks the canary. Do not weaken a check to obtain a passing report.
 Private endpoints, authentication data, key-provider configuration and operator
 keys belong outside this public repository. The eventual canary requires a new
 explicit approval because it will use test-only credentials and transactions.
+
+## Live read-only runner
+
+The repository includes a fail-closed command that wires the manifest validator
+to host, systemd, Cronos RPC and Xitcoin RPC inspectors:
+
+```sh
+npm run preflight:testnet -- /absolute/path/to/testnet-preflight.json
+```
+
+Run it only with Node `24.19.0`. The command reads no keystore, creates no
+signature, installs no unit and exposes no transaction-submission operation. It
+returns a sanitized JSON report and exits non-zero on any failed check or RPC
+disagreement. Keep private RPC URLs in the external manifest, never in Git.
