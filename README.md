@@ -29,10 +29,13 @@ Xitcoin message decoding remains an explicit canonical dependency rather than a
 heuristic event parser. The approval coordinator requests bounded HTTPS
 responses from isolated signers, recovers each signer locally, persists an
 immutable deterministic 2-of-3 quorum and remains restart-safe. Network
-submission and private-key handling remain deliberately excluded. The isolated
+submission remains deliberately excluded. The isolated
 signer service enforces a pinned route, chain, vault, amount and deadline,
 requires an independent canonical-finality verifier, and delegates signing to
-an injected external key provider. No operator key loader is included. Runtime
+an injected key provider. The optional secure keystore adapter reads bounded,
+owner-private encrypted keystores and systemd credentials, verifies the expected
+account and exposes only digest signing; it has no environment-variable or
+command-line password fallback. Runtime
 composition validates separated identities and independent RPC origins, halts
 on critical worker failure, and exposes bounded liveness and readiness state.
 Hardened systemd units are provided as disabled review-only templates.
