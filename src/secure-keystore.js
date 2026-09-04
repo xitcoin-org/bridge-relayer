@@ -19,7 +19,7 @@ function absolutePath(value, label) {
   return path;
 }
 
-async function boundedPrivateFile({ path, label, maximumBytes, expectedOwnerUid, open }) {
+async function boundedPrivateFile({ path, label, maximumBytes, expectedOwnerUid, allowGroupRead = false, open }) {
   let handle;
   try {
     handle = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
@@ -27,7 +27,8 @@ async function boundedPrivateFile({ path, label, maximumBytes, expectedOwnerUid,
     if (!metadata.isFile()) throw new Error(`${label} must be a regular file`);
     if (metadata.uid !== expectedOwnerUid) throw new Error(`${label} has an unexpected owner`);
     if (metadata.size < 1 || metadata.size > maximumBytes) throw new Error(`${label} has an invalid size`);
-    if ((metadata.mode & 0o077) !== 0) throw new Error(`${label} permissions are too broad`);
+    const forbiddenMode = allowGroupRead ? 0o037 : 0o077;
+    if ((metadata.mode & forbiddenMode) !== 0) throw new Error(`${label} permissions are too broad`);
     const bytes = await handle.readFile();
     if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > maximumBytes) {
       throw new Error(`${label} has an invalid size`);
@@ -59,6 +60,7 @@ async function loadBearerToken({
       label: "transport credential",
       maximumBytes: safeInteger(maximumCredentialBytes, "maximum credential size", 1),
       expectedOwnerUid: safeInteger(expectedOwnerUid, "expected owner uid"),
+      allowGroupRead: expectedOwnerUid === 0,
       open,
     });
     const token = Buffer.from(credentialText(source, "transport credential"));
@@ -98,7 +100,14 @@ export async function createEncryptedKeystoreDigestSigner({
   try {
     [keystoreBytes, credentialBytes] = await Promise.all([
       boundedPrivateFile({ path: keystore, label: "keystore", maximumBytes: keystoreLimit, expectedOwnerUid: ownerUid, open }),
-      boundedPrivateFile({ path: credential, label: "credential", maximumBytes: credentialLimit, expectedOwnerUid: credentialOwnerUid, open }),
+      boundedPrivateFile({
+        path: credential,
+        label: "credential",
+        maximumBytes: credentialLimit,
+        expectedOwnerUid: credentialOwnerUid,
+        allowGroupRead: credentialOwnerUid === 0,
+        open,
+      }),
     ]);
     const wallet = await decrypt(
       keystoreBytes.toString("utf8"),
