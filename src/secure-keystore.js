@@ -44,6 +44,34 @@ function credentialText(bytes, label) {
   return value;
 }
 
+async function loadBearerToken({
+  credentialPath,
+  expectedOwnerUid = process.geteuid(),
+  maximumCredentialBytes = 4_096,
+  open = openDefault,
+}) {
+  const credential = absolutePath(credentialPath, "transport credential path");
+  if (typeof open !== "function") throw new Error("secure credential dependency is required");
+  let source;
+  try {
+    source = await boundedPrivateFile({
+      path: credential,
+      label: "transport credential",
+      maximumBytes: safeInteger(maximumCredentialBytes, "maximum credential size", 1),
+      expectedOwnerUid: safeInteger(expectedOwnerUid, "expected owner uid"),
+      open,
+    });
+    const token = Buffer.from(credentialText(source, "transport credential"));
+    if (token.length < 32) {
+      token.fill(0);
+      throw new Error("transport credential is too short");
+    }
+    return token;
+  } finally {
+    source?.fill(0);
+  }
+}
+
 export async function createEncryptedKeystoreDigestSigner({
   keystorePath,
   credentialPath,
@@ -99,19 +127,8 @@ export async function createBearerCredentialAuthorizer({
   maximumCredentialBytes = 4_096,
   open = openDefault,
 }) {
-  const credential = absolutePath(credentialPath, "transport credential path");
-  if (typeof open !== "function") throw new Error("secure credential dependency is required");
-  let source;
   try {
-    source = await boundedPrivateFile({
-      path: credential,
-      label: "transport credential",
-      maximumBytes: safeInteger(maximumCredentialBytes, "maximum credential size", 1),
-      expectedOwnerUid: safeInteger(expectedOwnerUid, "expected owner uid"),
-      open,
-    });
-    const token = Buffer.from(credentialText(source, "transport credential"));
-    if (token.length < 32) throw new Error("transport credential is too short");
+    const token = await loadBearerToken({ credentialPath, expectedOwnerUid, maximumCredentialBytes, open });
     return async function authorize(request) {
       const header = String(request?.headers?.authorization ?? "");
       if (!header.startsWith("Bearer ")) return false;
@@ -120,7 +137,16 @@ export async function createBearerCredentialAuthorizer({
     };
   } catch {
     throw new Error("transport authorization material could not be loaded");
-  } finally {
-    source?.fill(0);
+  }
+}
+
+export async function createBearerCredentialHeader(options) {
+  try {
+    const token = await loadBearerToken(options);
+    return async function authorizationHeader() {
+      return `Bearer ${token.toString("utf8")}`;
+    };
+  } catch {
+    throw new Error("transport authentication material could not be loaded");
   }
 }

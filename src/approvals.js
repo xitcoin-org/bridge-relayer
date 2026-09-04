@@ -134,14 +134,17 @@ function approvalUrl(value, allowHttp) {
 }
 
 export class RemoteSignerClient {
-  constructor({ url, identity, timeoutMs = 10_000, maxResponseBytes = 16_384, allowHttp = false, fetchImpl = globalThis.fetch }) {
+  constructor({ url, identity, timeoutMs = 10_000, maxResponseBytes = 16_384, allowHttp = false,
+    authorizationHeader, fetchImpl = globalThis.fetch }) {
     this.url = approvalUrl(url, allowHttp);
     this.identity = String(identity ?? this.url.origin).trim();
     if (!this.identity) throw new Error("signer identity is required");
     if (typeof fetchImpl !== "function") throw new Error("fetch implementation is required");
+    if (typeof authorizationHeader !== "function") throw new Error("signer transport authentication is required");
     this.timeoutMs = positiveInteger(timeoutMs, "signer timeout");
     this.maxResponseBytes = positiveInteger(maxResponseBytes, "maximum signer response size");
     this.fetch = fetchImpl;
+    this.authorizationHeader = authorizationHeader;
   }
 
   async approve(request) {
@@ -149,9 +152,13 @@ export class RemoteSignerClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let body;
     try {
+      const authorization = String(await this.authorizationHeader());
+      if (!authorization.startsWith("Bearer ") || authorization.length < 39 || /[\r\n]/.test(authorization)) {
+        throw new Error("signer transport authentication is invalid");
+      }
       const response = await this.fetch(this.url, {
         method: "POST",
-        headers: { accept: "application/json", "content-type": "application/json" },
+        headers: { accept: "application/json", authorization, "content-type": "application/json" },
         body: JSON.stringify(request),
         redirect: "error",
         signal: controller.signal,
