@@ -1,7 +1,7 @@
 import { getAddress, isHexString } from "ethers";
 
 import { buildApprovalRequest } from "./approvals.js";
-import { cronosRouteId, DIRECTION_INBOUND, DIRECTION_OUTBOUND, normalizeBytes32, validateRouteId } from "./protocol.js";
+import { DIRECTION_INBOUND, DIRECTION_OUTBOUND, normalizeBytes32, validateRouteId } from "./protocol.js";
 
 function positiveInteger(value, label, minimum = 0) {
   const number = Number(value);
@@ -41,11 +41,11 @@ function matchesEvidence(record, expected) {
     Number(record[expected.indexField]) === expected.eventIndex;
 }
 
-function matchingInbound(record, payload, expected) {
+function matchingInbound(record, payload, expected, expectedCronosRouteId) {
   const sourceRef = normalizeBytes32(payload.sourceRef);
   return matchesEvidence(record, expected) &&
     normalizeBytes32(record.payload?.depositId) === sourceRef &&
-    normalizeBytes32(record.routeId) === cronosRouteId(validateRouteId(payload.routeId)).toLowerCase() &&
+    normalizeBytes32(record.routeId) === expectedCronosRouteId &&
     sameText(record.payload?.destination, payload.destination) &&
     sameText(record.payload?.amount, payload.amount) &&
     sameText(record.payload?.nonce, payload.nonce);
@@ -59,7 +59,8 @@ function matchingOutbound(record, payload, expected) {
     sameText(record.payload?.amount, payload.amount);
 }
 
-export function createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher }) {
+export function createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher, cronosRouteId }) {
+  const expectedCronosRouteId = normalizeBytes32(cronosRouteId);
   if (!cronosWatcher || typeof cronosWatcher.events !== "function" || typeof cronosWatcher.verifyCanonicalEvent !== "function") {
     throw new Error("Cronos source watcher is required");
   }
@@ -73,7 +74,7 @@ export function createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher })
     const watcher = canonical.direction === DIRECTION_INBOUND ? cronosWatcher : xitcoinWatcher;
     const records = await watcher.events(expected.blockHeight, expected.blockHeight);
     const matches = records.filter((record) => canonical.direction === DIRECTION_INBOUND
-      ? matchingInbound(record, canonical.payload, expected)
+      ? matchingInbound(record, canonical.payload, expected, expectedCronosRouteId)
       : matchingOutbound(record, canonical.payload, expected));
 
     if (matches.length !== 1) throw new Error("canonical source event does not match approval request");

@@ -2,7 +2,8 @@ import { constants as fsConstants } from "node:fs";
 import { open as openDefault } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
-import { cronosRouteId } from "./protocol.js";
+import { normalizeBytes32 } from "./protocol.js";
+import { TESTNET_ROUTE_ID } from "./preflight.js";
 import {
   connectCronosProviders,
   connectXitcoinClients,
@@ -54,12 +55,15 @@ export function validateSignerConfig(input) {
   const config = keys(object(input, "signer config"), ["version", "identity", "expectedAddress", "keystorePath", "listen", "policy", "cronos", "xitcoin"], "signer config");
   if (config.version !== 1) throw new Error("signer config version is unsupported");
   const listen = keys(object(config.listen, "listener"), ["host", "port"], "listener");
-  const policy = keys(object(config.policy, "policy"), ["routeId", "cronosChainId", "cronosVault", "maximumAmount", "maximumDeadlineSeconds"], "policy");
+  const policy = keys(object(config.policy, "policy"), ["routeId", "cronosRouteId", "cronosChainId", "cronosVault", "maximumAmount", "maximumDeadlineSeconds"], "policy");
   const cronos = keys(object(config.cronos, "Cronos config"), ["rpcUrls", "confirmations", "maxBatch"], "Cronos config");
   const xitcoin = keys(object(config.xitcoin, "Xitcoin config"), ["rpcUrls", "chainId", "safetyLag", "maxBatch", "allowLoopbackHttp"], "Xitcoin config");
   const identity = text(config.identity, "signer identity");
   if (!/^signer-[123]$/.test(identity)) throw new Error("signer identity is not canonical");
   const routeId = text(policy.routeId, "route ID");
+  if (routeId !== "cronos-testnet-xitcoin-testnet") throw new Error("testnet route ID is not canonical");
+  const pinnedCronosRouteId = normalizeBytes32(policy.cronosRouteId);
+  if (pinnedCronosRouteId !== TESTNET_ROUTE_ID.toLowerCase()) throw new Error("Cronos testnet route ID is not canonical");
   const cronosChainId = integer(policy.cronosChainId, "Cronos chain ID");
   if (cronosChainId !== 338) throw new Error("Cronos Testnet chain ID must be 338");
   const normalized = {
@@ -70,6 +74,7 @@ export function validateSignerConfig(input) {
     listen: { host: text(listen.host, "listener host"), port: integer(listen.port, "listener port") },
     policy: {
       routeId,
+      cronosRouteId: pinnedCronosRouteId,
       cronosChainId,
       cronosVault: text(policy.cronosVault, "Cronos vault"),
       maximumAmount: text(policy.maximumAmount, "maximum amount"),
@@ -136,7 +141,7 @@ export async function buildSignerRuntime(config, {
   const cronosWatcher = makeCronosWatcher({
     providers,
     vault: manifest.policy.cronosVault,
-    routeId: cronosRouteId(manifest.policy.routeId),
+    routeId: manifest.policy.cronosRouteId,
     confirmations: manifest.cronos.confirmations,
     maxBatch: manifest.cronos.maxBatch,
   });
@@ -160,7 +165,7 @@ export async function buildSignerRuntime(config, {
     keystorePath: manifest.keystorePath,
     keystoreCredentialPath: join(credentialRoot, "keystore-password"),
     policy,
-    verifySource: makeVerifier({ cronosWatcher, xitcoinWatcher }),
+    verifySource: makeVerifier({ cronosWatcher, xitcoinWatcher, cronosRouteId: manifest.policy.cronosRouteId }),
   });
   const handler = await makeHandler({ service, transportCredentialPath: join(credentialRoot, "transport-token") });
   const server = await startServer({ handler, host: manifest.listen.host, port: manifest.listen.port });
