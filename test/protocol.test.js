@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { evmAddressToBech32 } from "../src/address.js";
 import { attestationDigest, attestationId, cronosRouteId, depositId, releaseDigest } from "../src/protocol.js";
+import { TESTNET_ROUTE_ID } from "../src/preflight.js";
 
 test("converts EVM account bytes to deterministic Xitcoin Bech32", () => {
   assert.equal(
@@ -40,6 +41,12 @@ test("builds stable route, deposit and attestation identifiers", () => {
   };
   assert.match(attestationId(attestation), /^0x[0-9a-f]{64}$/);
   assert.match(attestationDigest(attestation), /^0x[0-9a-f]{64}$/);
+});
+
+test("pins the deployed Cronos testnet route independently from the Xitcoin route", () => {
+  const xitcoinRoute = "cronos-testnet-xitcoin-testnet";
+  assert.equal(TESTNET_ROUTE_ID, "0x21121c16b53a726056a6683f00c7eb4da5501ce8a2abc8a4677e06f1e94b5cd9");
+  assert.notEqual(cronosRouteId(xitcoinRoute), TESTNET_ROUTE_ID);
 });
 
 test("binds release approval to chain and vault", () => {
