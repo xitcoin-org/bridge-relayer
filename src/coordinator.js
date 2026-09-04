@@ -1,12 +1,96 @@
 import { FinalityViolation } from "./watchers.js";
 import { collectApprovalQuorum } from "./approvals.js";
 import { buildApprovalRequest } from "./approvals.js";
+import { DIRECTION_INBOUND, DIRECTION_OUTBOUND, normalizeBytes32, validateRouteId } from "./protocol.js";
 export { submitApprovedTransfer } from "./submission.js";
 
 function height(value, label) {
   const number = Number(value);
   if (!Number.isSafeInteger(number) || number < 0) throw new Error(`${label} must be a non-negative safe integer`);
   return number;
+}
+
+function positiveInteger(value, label) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error(`${label} must be a positive safe integer`);
+  return number;
+}
+
+function payloadOf(transfer) {
+  try {
+    const payload = typeof transfer.payload === "string" ? JSON.parse(transfer.payload) : transfer.payload;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error();
+    return payload;
+  } catch {
+    throw new Error("stored transfer payload is invalid");
+  }
+}
+
+function sourceEvidence(transfer) {
+  const transactionHash = normalizeBytes32(transfer.transaction_hash);
+  return Object.freeze({
+    blockHeight: positiveInteger(transfer.block_height, "source block height"),
+    blockHash: normalizeBytes32(transfer.block_hash),
+    transactionHash,
+    eventIndex: positiveInteger(Number(transfer.event_index) + 1, "source event index offset") - 1,
+  });
+}
+
+function storedSourceRef(value) {
+  const text = String(value);
+  return normalizeBytes32(text.startsWith("0x") ? text : `0x${text}`);
+}
+
+export function buildTransferApprovalRequest({
+  transfer,
+  routeId,
+  cronosRouteId,
+  cronosChainId,
+  cronosVault,
+  signerSetVersion = 1,
+  deadlineUnix,
+}) {
+  if (!transfer || transfer.state !== "finalized") throw new Error("a finalized transfer is required");
+  const canonicalRouteId = validateRouteId(routeId);
+  const chainId = positiveInteger(cronosChainId, "Cronos chain ID");
+  const deadline = positiveInteger(deadlineUnix, "approval deadline");
+  const payload = payloadOf(transfer);
+  const evidence = sourceEvidence(transfer);
+
+  if (transfer.source_chain === "cronos") {
+    if (normalizeBytes32(transfer.route_id) !== normalizeBytes32(cronosRouteId)) throw new Error("Cronos route mapping mismatch");
+    const sourceRef = normalizeBytes32(payload.depositId);
+    if (sourceRef !== storedSourceRef(transfer.source_ref)) throw new Error("Cronos source reference mismatch");
+    return buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
+      routeId: canonicalRouteId,
+      sourceChainId: String(chainId),
+      sourceRef,
+      nonce: String(payload.nonce),
+      destination: String(payload.destination),
+      amount: String(payload.amount),
+      deadlineUnix: deadline,
+      sourceEvidence: evidence,
+    } });
+  }
+
+  if (transfer.source_chain === "xitcoin") {
+    if (String(transfer.route_id) !== canonicalRouteId) throw new Error("Xitcoin route mapping mismatch");
+    const sourceBurnId = normalizeBytes32(payload.requestId);
+    if (sourceBurnId !== storedSourceRef(transfer.source_ref)) throw new Error("Xitcoin source reference mismatch");
+    return buildApprovalRequest({ direction: DIRECTION_OUTBOUND, payload: {
+      routeId: canonicalRouteId,
+      chainId,
+      vault: cronosVault,
+      sourceBurnId,
+      recipient: String(payload.destination),
+      amount: String(payload.amount),
+      signerSetVersion: positiveInteger(signerSetVersion, "signer set version"),
+      deadline,
+      sourceEvidence: evidence,
+    } });
+  }
+
+  throw new Error("unsupported source chain");
 }
 
 export async function approveFinalizedTransfer({

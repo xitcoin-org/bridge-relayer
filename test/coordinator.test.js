@@ -1,8 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { scanFinalizedBatch } from "../src/coordinator.js";
-import { approveFinalizedTransfer } from "../src/coordinator.js";
+import { approveFinalizedTransfer, buildTransferApprovalRequest, scanFinalizedBatch } from "../src/coordinator.js";
 import { buildApprovalRequest } from "../src/approvals.js";
 import { DIRECTION_INBOUND } from "../src/protocol.js";
 import { SigningKey, computeAddress } from "ethers";
@@ -11,6 +10,9 @@ import { RelayStore } from "../src/store.js";
 import { FinalityViolation } from "../src/watchers.js";
 
 const blockHash = `0x${"11".repeat(32)}`;
+const txHash = `0x${"22".repeat(32)}`;
+const routeBytes = `0x${"33".repeat(32)}`;
+const vault = "0x1111111111111111111111111111111111111111";
 
 function watcher(overrides = {}) {
   return {
@@ -36,6 +38,49 @@ test("scan loop finalizes observations and advances a canonical checkpoint", asy
   const resumed = await scanFinalizedBatch({ watcher: watcher(), store, sourceChain: "cronos", startHeight: 1, maxBatch: 2 });
   assert.equal(resumed.from, 12);
   assert.equal(resumed.to, 12);
+  store.close();
+});
+
+test("maps an exact Cronos event to one canonical inbound approval request", () => {
+  const store = new RelayStore();
+  const depositId = `0x${"44".repeat(32)}`;
+  store.observe({ sourceChain: "cronos", sourceRef: depositId.slice(2), routeId: routeBytes,
+    blockHeight: 10, blockHash, transactionHash: txHash, logIndex: 2,
+    payload: { depositId, nonce: "7", destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "10" } });
+  const transfer = store.transition("cronos", depositId.slice(2), "finalized");
+  const request = buildTransferApprovalRequest({ transfer, routeId: "cronos-testnet-xitcoin-testnet",
+    cronosRouteId: routeBytes, cronosChainId: 338, cronosVault: vault, deadlineUnix: 2_000_000_000 });
+  assert.equal(request.direction, "cronos_to_xitcoin");
+  assert.equal(request.payload.routeId, "cronos-testnet-xitcoin-testnet");
+  assert.equal(request.payload.sourceRef, depositId);
+  assert.deepEqual(request.payload.sourceEvidence, { blockHeight: 10, blockHash, transactionHash: txHash, eventIndex: 2 });
+  store.close();
+});
+
+test("maps an exact Xitcoin event to one canonical outbound approval request", () => {
+  const store = new RelayStore();
+  const requestId = `0x${"55".repeat(32)}`;
+  store.observe({ sourceChain: "xitcoin", sourceRef: requestId, routeId: "cronos-testnet-xitcoin-testnet",
+    blockHeight: 11, blockHash, transactionHash: txHash, messageIndex: 3,
+    payload: { requestId, destination: "0x2222222222222222222222222222222222222222", amount: "20", nonce: "8" } });
+  const transfer = store.transition("xitcoin", requestId, "finalized");
+  const request = buildTransferApprovalRequest({ transfer, routeId: "cronos-testnet-xitcoin-testnet",
+    cronosRouteId: routeBytes, cronosChainId: 338, cronosVault: vault, signerSetVersion: 1, deadlineUnix: 2_000_000_000 });
+  assert.equal(request.direction, "xitcoin_to_cronos");
+  assert.equal(request.payload.sourceBurnId, requestId);
+  assert.equal(request.payload.chainId, 338);
+  assert.deepEqual(request.payload.sourceEvidence, { blockHeight: 11, blockHash, transactionHash: txHash, eventIndex: 3 });
+  store.close();
+});
+
+test("refuses ambiguous or mismatched stored source evidence", () => {
+  const store = new RelayStore();
+  const depositId = `0x${"66".repeat(32)}`;
+  store.observe({ sourceChain: "cronos", sourceRef: depositId, routeId: routeBytes,
+    blockHeight: 10, blockHash, payload: { depositId, nonce: "1", destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "1" } });
+  const transfer = store.transition("cronos", depositId, "finalized");
+  assert.throws(() => buildTransferApprovalRequest({ transfer, routeId: "cronos-testnet-xitcoin-testnet",
+    cronosRouteId: routeBytes, cronosChainId: 338, cronosVault: vault, deadlineUnix: 2_000_000_000 }), /bytes32/);
   store.close();
 });
 
