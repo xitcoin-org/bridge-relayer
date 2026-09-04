@@ -68,4 +68,9 @@ npm run vectors
 See [`docs/PROTOCOL.md`](docs/PROTOCOL.md) and
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
-Destination submission is restart-safe: the coordinator checks the canonical destination state before broadcasting, persists the transaction reference, and completes only after a matching finalized confirmation. Broadcasters and status clients are injected; this repository stores no operator key.
+The public destination submitter phase provides strict root-owned manifests,
+immutable release binding and offline checks for `xitcoin` and `cronos`. Both
+startup paths fail closed pending production adapters and durable broadcast
+recovery. See [phase-one scope and exact gaps](docs/SUBMITTERS.md). The existing
+submission helper and staging adapters exercise status-first recovery and
+idempotent completion; they do not yet provide a production broadcaster.

@@ -13,7 +13,9 @@
     "vectors": "node src/vectors.js",
     "preflight:testnet": "node src/preflight-cli.js",
     "signer:start": "node src/signer-cli.js",
-    "coordinator:start": "node src/coordinator-cli.js"
+    "coordinator:start": "node src/coordinator-cli.js",
+    "submitter:check": "node src/submitter-cli.js check",
+    "submitter:start": "node src/submitter-cli.js start"
   },
   "license": "MIT",
   "dependencies": {
