@@ -27,6 +27,19 @@ function mockOpen(files, { mode = 0o100600, uid = OWNER_UID } = {}) {
   };
 }
 
+function mockOpenOwners(files, owners, mode = 0o100600) {
+  return async (path, flags) => {
+    const source = files.get(path);
+    if (!source) throw new Error("missing fixture");
+    return {
+      async stat() { return privateStat(source.length, mode, owners.get(path)); },
+      async readFile() { return Buffer.from(source); },
+      async close() {},
+      flags,
+    };
+  };
+}
+
 test("loads bounded private key material and signs only with the expected account", async () => {
   const files = new Map([
     ["/keys/signer.json", Buffer.from('{"encrypted":true}')],
@@ -66,6 +79,40 @@ test("decrypts a real Web3 keystore through the default adapter", async () => {
     open: mockOpen(files),
   });
   assert.equal(recoverAddress(DIGEST, await signer.signDigest(DIGEST)), ADDRESS);
+});
+
+test("accepts a service-owned keystore with a root-owned systemd credential", async () => {
+  const serviceUid = 1001;
+  const keystorePath = "/keys/signer.json";
+  const credentialPath = "/run/credentials/keystore-password";
+  const files = new Map([
+    [keystorePath, Buffer.from('{"encrypted":true}')],
+    [credentialPath, Buffer.from("host-bound-password")],
+  ]);
+  const signer = await createEncryptedKeystoreDigestSigner({
+    keystorePath,
+    credentialPath,
+    expectedAddress: ADDRESS,
+    expectedOwnerUid: serviceUid,
+    open: mockOpenOwners(files, new Map([[keystorePath, serviceUid], [credentialPath, 0]])),
+    decrypt: async () => ({ address: ADDRESS, signingKey: KEY }),
+  });
+  assert.equal(signer.signerAddress, ADDRESS);
+});
+
+test("accepts only a root-owned systemd bearer credential by default", async () => {
+  const path = "/run/credentials/transport-token";
+  const token = "r".repeat(48);
+  const files = new Map([[path, Buffer.from(token)]]);
+  const authorize = await createBearerCredentialAuthorizer({
+    credentialPath: path,
+    open: mockOpen(files, { uid: 0 }),
+  });
+  assert.equal(await authorize({ headers: { authorization: `Bearer ${token}` } }), true);
+  await assert.rejects(
+    () => createBearerCredentialAuthorizer({ credentialPath: path, open: mockOpen(files, { uid: 1001 }) }),
+    /could not be loaded/,
+  );
 });
 
 test("rejects wrong accounts, broad permissions, oversized files and relative paths without leaking details", async () => {
