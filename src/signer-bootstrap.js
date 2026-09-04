@@ -93,9 +93,9 @@ export function validateSignerConfig(input) {
 }
 
 export async function loadSignerConfig(path, { open = openDefault, expectedOwnerUid = 0 } = {}) {
-  const target = absolute(path, "signer config path");
   let handle;
   try {
+    const target = absolute(path, "signer config path");
     handle = await open(target, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
     const metadata = await handle.stat();
     if (!metadata.isFile() || metadata.uid !== expectedOwnerUid || (metadata.mode & 0o022) !== 0) throw new Error("unsafe signer config metadata");
