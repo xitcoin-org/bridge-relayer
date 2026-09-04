@@ -56,3 +56,16 @@ test("persists immutable signer approvals idempotently", () => {
   assert.throws(() => store.recordApproval("cronos:25", observed().sourceRef, { ...approval, signature: `0x${"44".repeat(65)}` }), /conflicting/);
   store.close();
 });
+
+test("persists one immutable approval request before contacting signers", () => {
+  const store = new RelayStore();
+  store.observe(observed());
+  store.transition("cronos:25", observed().sourceRef, "finalized");
+  const request = { version: 1, direction: "cronos_to_xitcoin", digest: `0x${"44".repeat(32)}`, deadlineUnix: 2_000_000_000, payload: { amount: "1" } };
+  assert.deepEqual(store.persistApprovalRequest("cronos:25", observed().sourceRef, request), request);
+  assert.deepEqual(store.approvalRequest("cronos:25", observed().sourceRef), request);
+  assert.throws(() => store.persistApprovalRequest("cronos:25", observed().sourceRef, {
+    ...request, deadlineUnix: request.deadlineUnix + 1,
+  }), /conflicting/);
+  store.close();
+});
