@@ -27,7 +27,13 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
       - run: npm run check
       - run: npm test
       - run: npm run vectors
+      - name: Audit production dependencies
+        run: >-
+          npm audit --omit=dev --audit-level=high
+          --fetch-timeout=60000
+          --fetch-retries=2
+          --fetch-retry-mintimeout=1000
+          --fetch-retry-maxtimeout=10000
