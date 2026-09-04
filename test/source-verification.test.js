@@ -10,6 +10,7 @@ const blockHash = `0x${"11".repeat(32)}`;
 const transactionHash = `0x${"22".repeat(32)}`;
 const sourceRef = `0x${"33".repeat(32)}`;
 const routeId = "cronos-xitcoin-xtc-v1";
+const expectedCronosRouteId = id(routeId);
 const destination = "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9";
 const recipient = "0x3333333333333333333333333333333333333333";
 
@@ -40,7 +41,7 @@ test("independently verifies an exact finalized Cronos deposit before signing", 
     payload: { depositId: sourceRef, destination, amount: "500", nonce: "7" },
   };
   const cronosWatcher = watcher(record);
-  const verify = createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher: watcher({}) });
+  const verify = createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher: watcher({}), cronosRouteId: expectedCronosRouteId });
   const request = buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
     routeId, sourceChainId: "338", sourceRef, nonce: "7", destination, amount: "500",
     deadlineUnix: 1_900_000_300, sourceEvidence: sourceEvidence(),
@@ -56,7 +57,7 @@ test("rejects substituted Cronos evidence before invoking canonical verification
     payload: { depositId: sourceRef, destination, amount: "500", nonce: "7" },
   };
   const cronosWatcher = watcher(record);
-  const verify = createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher: watcher({}) });
+  const verify = createCanonicalSourceVerifier({ cronosWatcher, xitcoinWatcher: watcher({}), cronosRouteId: expectedCronosRouteId });
   const request = buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
     routeId, sourceChainId: "338", sourceRef, nonce: "7", destination, amount: "501",
     deadlineUnix: 1_900_000_300, sourceEvidence: sourceEvidence(),
@@ -72,7 +73,7 @@ test("independently verifies an exact finalized Xitcoin burn before signing", as
     payload: { requestId: sourceRef, destination: recipient, amount: "900", nonce: "4" },
   };
   const xitcoinWatcher = watcher(record);
-  const verify = createCanonicalSourceVerifier({ cronosWatcher: watcher({}), xitcoinWatcher });
+  const verify = createCanonicalSourceVerifier({ cronosWatcher: watcher({}), xitcoinWatcher, cronosRouteId: expectedCronosRouteId });
   const request = buildApprovalRequest({ direction: DIRECTION_OUTBOUND, payload: {
     routeId, chainId: 338, vault: "0x1111111111111111111111111111111111111111",
     sourceBurnId: sourceRef, recipient, amount: "900", signerSetVersion: 1,
@@ -88,7 +89,7 @@ test("rejects missing, moved and ambiguous source evidence", async () => {
     routeId, blockHeight: 100, blockHash, transactionHash, messageIndex: 2,
     payload: { requestId: sourceRef, destination: recipient, amount: "900" },
   };
-  const verify = createCanonicalSourceVerifier({ cronosWatcher: watcher({}), xitcoinWatcher: watcher(record) });
+  const verify = createCanonicalSourceVerifier({ cronosWatcher: watcher({}), xitcoinWatcher: watcher(record), cronosRouteId: expectedCronosRouteId });
   const payload = {
     routeId, chainId: 338, vault: "0x1111111111111111111111111111111111111111",
     sourceBurnId: sourceRef, recipient, amount: "900", signerSetVersion: 1, deadline: 1_900_000_300,
