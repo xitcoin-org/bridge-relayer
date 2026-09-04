@@ -144,3 +144,63 @@ export async function scanFinalizedBatch({ watcher, store, sourceChain, startHei
   store.advanceCheckpoint(sourceChain, to, canonical.hash);
   return { from, to, observed: events.length, idle: false };
 }
+
+export async function runApprovalOnlyCycle({
+  store,
+  cronosWatcher,
+  xitcoinWatcher,
+  clients,
+  authorizedSigners,
+  routeId,
+  cronosRouteId,
+  cronosChainId,
+  cronosVault,
+  signerSetVersion = 1,
+  approvalWindowSeconds = 300,
+  nowUnix = Math.floor(Date.now() / 1000),
+  startHeights = { cronos: 1, xitcoin: 1 },
+  maxBatch = 100,
+  maximumApprovals = 100,
+}) {
+  if (!store || !cronosWatcher || !xitcoinWatcher) throw new Error("approval-only coordinator dependencies are required");
+  const now = height(nowUnix, "current time");
+  const window = positiveInteger(approvalWindowSeconds, "approval window");
+  const limit = positiveInteger(maximumApprovals, "maximum approvals per cycle");
+  if (window > 900) throw new Error("approval window exceeds coordinator limit");
+  if (limit > 100) throw new Error("approval cycle exceeds bounded transfer limit");
+
+  const scans = {
+    cronos: await scanFinalizedBatch({ watcher: cronosWatcher, store, sourceChain: "cronos", startHeight: startHeights.cronos, maxBatch }),
+    xitcoin: await scanFinalizedBatch({ watcher: xitcoinWatcher, store, sourceChain: "xitcoin", startHeight: startHeights.xitcoin, maxBatch }),
+  };
+  const finalized = store.pending().filter((transfer) => transfer.state === "finalized").slice(0, limit);
+  const results = [];
+  for (const transfer of finalized) {
+    const request = store.approvalRequest(transfer.source_chain, transfer.source_ref) ?? buildTransferApprovalRequest({
+      transfer,
+      routeId,
+      cronosRouteId,
+      cronosChainId,
+      cronosVault,
+      signerSetVersion,
+      deadlineUnix: now + window,
+    });
+    results.push(await approveFinalizedTransfer({
+      store,
+      sourceChain: transfer.source_chain,
+      sourceRef: transfer.source_ref,
+      request,
+      clients,
+      authorizedSigners,
+      threshold: 2,
+      nowUnix: now,
+    }));
+  }
+  return Object.freeze({
+    mode: "approval_only",
+    scans: Object.freeze(scans),
+    finalized: finalized.length,
+    approved: results.length,
+    submissions: 0,
+  });
+}

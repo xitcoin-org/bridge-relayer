@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { approveFinalizedTransfer, buildTransferApprovalRequest, scanFinalizedBatch } from "../src/coordinator.js";
+import { approveFinalizedTransfer, buildTransferApprovalRequest, runApprovalOnlyCycle, scanFinalizedBatch } from "../src/coordinator.js";
 import { buildApprovalRequest } from "../src/approvals.js";
 import { DIRECTION_INBOUND } from "../src/protocol.js";
 import { SigningKey, computeAddress } from "ethers";
@@ -155,5 +155,56 @@ test("approval coordinator never changes a persisted request after a failed quor
     request: buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: { ...request.payload, deadlineUnix: 2_000_000_001 } }),
     clients: [], authorizedSigners: addresses, nowUnix: 1_900_000_000,
   }), /conflicting/);
+  store.close();
+});
+
+test("approval-only cycle scans both chains and stops after a two-of-three quorum", async () => {
+  const store = new RelayStore();
+  const depositId = `0x${"77".repeat(32)}`;
+  const keys = Array.from({ length: 3 }, () => new SigningKey(randomBytes(32)));
+  const addresses = keys.map((key) => computeAddress(key.publicKey));
+  const clients = keys.map((key, index) => ({ identity: `signer-${index + 1}`, async approve(request) {
+    return { signer: addresses[index], digest: request.digest, signature: key.sign(request.digest).serialized };
+  } }));
+  const cronosWatcher = watcher({
+    async latestFinalizedHeight() { return 10; },
+    async events() { return [{ sourceChain: "cronos", sourceRef: depositId.slice(2), routeId: routeBytes,
+      blockHeight: 10, blockHash, transactionHash: txHash, logIndex: 2,
+      payload: { depositId, nonce: "7", destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "10" } }]; },
+  });
+  const xitcoinWatcher = watcher({
+    async latestFinalizedHeight() { return 0; },
+    async events() { return []; },
+  });
+  const result = await runApprovalOnlyCycle({ store, cronosWatcher, xitcoinWatcher, clients,
+    authorizedSigners: addresses, routeId: "cronos-testnet-xitcoin-testnet", cronosRouteId: routeBytes,
+    cronosChainId: 338, cronosVault: vault, nowUnix: 1_900_000_000, startHeights: { cronos: 10, xitcoin: 1 } });
+  assert.equal(result.mode, "approval_only");
+  assert.equal(result.approved, 1);
+  assert.equal(result.submissions, 0);
+  assert.equal(store.get("cronos", depositId.slice(2)).state, "approved");
+  assert.equal(store.approvals("cronos", depositId.slice(2)).length, 2);
+  store.close();
+});
+
+test("approval-only cycle persists the request and fails closed without quorum", async () => {
+  const store = new RelayStore();
+  const requestId = `0x${"88".repeat(32)}`;
+  const keys = Array.from({ length: 3 }, () => new SigningKey(randomBytes(32)));
+  const addresses = keys.map((key) => computeAddress(key.publicKey));
+  const xitcoinWatcher = watcher({
+    async latestFinalizedHeight() { return 11; },
+    async events() { return [{ sourceChain: "xitcoin", sourceRef: requestId, routeId: "cronos-testnet-xitcoin-testnet",
+      blockHeight: 11, blockHash, transactionHash: txHash, messageIndex: 1,
+      payload: { requestId, destination: "0x2222222222222222222222222222222222222222", amount: "20", nonce: "8" } }]; },
+    async canonicalBlock(height) { return { height, hash: blockHash }; },
+  });
+  await assert.rejects(() => runApprovalOnlyCycle({ store,
+    cronosWatcher: watcher({ async latestFinalizedHeight() { return 0; } }), xitcoinWatcher, clients: [],
+    authorizedSigners: addresses, routeId: "cronos-testnet-xitcoin-testnet", cronosRouteId: routeBytes,
+    cronosChainId: 338, cronosVault: vault, nowUnix: 1_900_000_000, startHeights: { cronos: 1, xitcoin: 11 } }), /insufficient/);
+  assert.equal(store.get("xitcoin", requestId).state, "finalized");
+  assert.equal(store.approvalRequest("xitcoin", requestId).deadlineUnix, 1_900_000_300);
+  assert.equal(store.approvals("xitcoin", requestId).length, 0);
   store.close();
 });
