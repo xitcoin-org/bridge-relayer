@@ -3,10 +3,16 @@
 These units document process separation and hardening only. They are not
 installed or enabled by this repository.
 
-Private runtime wrappers must be supplied separately under
-`/opt/xitcoin-bridge-runtime`. They inject authenticated RPC transports,
-destination broadcasters and external key-provider adapters. Never add keys,
-mnemonics, tokens or production endpoints to these templates.
+Signer instances use the reviewed public CLI with a root-owned manifest at
+`/etc/xitcoin-bridge/signer-%i.json` and two distinct encrypted systemd
+credentials. Coordinator and submitter wrappers remain private runtime adapters.
+Never add keys, mnemonics, tokens or private production endpoints to templates
+or manifests.
+
+The signer template creates units named `xitcoin-bridge-signer@1.service`
+through `@3.service`. Keep them disabled until the immutable release symlink,
+root-owned manifest, encrypted credentials, RPC tunnels and complete preflight
+have all been reviewed.
 
 Create distinct system identities for the coordinator, each of the three
 signers, and each destination submitter. Review every path and sandbox setting
