@@ -46,7 +46,7 @@ function credentialText(bytes, label) {
 
 async function loadBearerToken({
   credentialPath,
-  expectedOwnerUid = process.geteuid(),
+  expectedOwnerUid = 0,
   maximumCredentialBytes = 4_096,
   open = openDefault,
 }) {
@@ -77,6 +77,7 @@ export async function createEncryptedKeystoreDigestSigner({
   credentialPath,
   expectedAddress,
   expectedOwnerUid = process.geteuid(),
+  expectedCredentialOwnerUid = 0,
   maximumKeystoreBytes = 65_536,
   maximumCredentialBytes = 4_096,
   open = openDefault,
@@ -89,6 +90,7 @@ export async function createEncryptedKeystoreDigestSigner({
     throw new Error("secure keystore dependencies are required");
   }
   const ownerUid = safeInteger(expectedOwnerUid, "expected owner uid");
+  const credentialOwnerUid = safeInteger(expectedCredentialOwnerUid, "expected credential owner uid");
   const keystoreLimit = safeInteger(maximumKeystoreBytes, "maximum keystore size", 1);
   const credentialLimit = safeInteger(maximumCredentialBytes, "maximum credential size", 1);
   let keystoreBytes;
@@ -96,7 +98,7 @@ export async function createEncryptedKeystoreDigestSigner({
   try {
     [keystoreBytes, credentialBytes] = await Promise.all([
       boundedPrivateFile({ path: keystore, label: "keystore", maximumBytes: keystoreLimit, expectedOwnerUid: ownerUid, open }),
-      boundedPrivateFile({ path: credential, label: "credential", maximumBytes: credentialLimit, expectedOwnerUid: ownerUid, open }),
+      boundedPrivateFile({ path: credential, label: "credential", maximumBytes: credentialLimit, expectedOwnerUid: credentialOwnerUid, open }),
     ]);
     const wallet = await decrypt(
       keystoreBytes.toString("utf8"),
@@ -123,7 +125,7 @@ export async function createEncryptedKeystoreDigestSigner({
 
 export async function createBearerCredentialAuthorizer({
   credentialPath,
-  expectedOwnerUid = process.geteuid(),
+  expectedOwnerUid = 0,
   maximumCredentialBytes = 4_096,
   open = openDefault,
 }) {
