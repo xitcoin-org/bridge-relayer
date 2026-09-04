@@ -5,7 +5,8 @@ installed or enabled by this repository.
 
 Signer instances use the reviewed public CLI with a root-owned manifest at
 `/etc/xitcoin-bridge/signer-%i.json` and two distinct encrypted systemd
-credentials. Coordinator and submitter wrappers remain private runtime adapters.
+credentials. The submitter template uses the public CLI and remains blocked in phase one.
+See [submitter requirements](../../docs/SUBMITTERS.md).
 Never add keys, mnemonics, tokens or private production endpoints to templates
 or manifests.
 

@@ -44,8 +44,9 @@ the process must never select one provider silently.
 
 ## Recovery
 
-The coordinator is restart-safe. It resumes non-terminal records from the local
-store and queries the destination replay-protection state before resubmission.
+The approval-only coordinator resumes non-terminal records from the local
+store. The submission helper queries destination replay-protection state, but
+production submission remains blocked; see [submitter phase one](SUBMITTERS.md).
 Operators must never delete a pending database merely to clear an error.
 
 ## Signer transport
@@ -136,7 +137,11 @@ activation.
 
 ## Submission recovery
 
-Never manually retry an approved or submitted transfer. Restart the coordinator: it queries the destination status first and resumes from the persisted transaction reference. Broadcasters must be separate, authenticated components. The Xitcoin deployment requires a canonical public attestation-status client before activation.
+Never manually retry an approved or submitted transfer. The submission helper
+can resume a persisted transaction reference or a canonically processed record.
+An ambiguous broadcast without a saved reference requires durable recovery that
+is not implemented yet. Both public submitter startup paths fail closed;
+[SUBMITTERS.md](SUBMITTERS.md) lists the exact adapter and persistence gaps.
 
 ## Testnet preflight
 
