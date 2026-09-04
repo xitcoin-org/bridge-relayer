@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { readFile as readFileDefault, stat as statDefault } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { open as openDefault } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 
 import { Wallet, getAddress, isHexString } from "ethers";
 
-function positiveInteger(value, label, minimum = 1) {
+function safeInteger(value, label, minimum = 0) {
   const number = Number(value);
   if (!Number.isSafeInteger(number) || number < minimum) {
     throw new Error(`${label} must be a safe integer >= ${minimum}`);
@@ -18,16 +19,23 @@ function absolutePath(value, label) {
   return path;
 }
 
-async function boundedPrivateFile({ path, label, maximumBytes, readFile, stat }) {
-  const metadata = await stat(path);
-  if (!metadata.isFile()) throw new Error(`${label} must be a regular file`);
-  if (metadata.size < 1 || metadata.size > maximumBytes) throw new Error(`${label} has an invalid size`);
-  if ((metadata.mode & 0o077) !== 0) throw new Error(`${label} permissions are too broad`);
-  const bytes = await readFile(path);
-  if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > maximumBytes) {
-    throw new Error(`${label} has an invalid size`);
+async function boundedPrivateFile({ path, label, maximumBytes, expectedOwnerUid, open }) {
+  let handle;
+  try {
+    handle = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) throw new Error(`${label} must be a regular file`);
+    if (metadata.uid !== expectedOwnerUid) throw new Error(`${label} has an unexpected owner`);
+    if (metadata.size < 1 || metadata.size > maximumBytes) throw new Error(`${label} has an invalid size`);
+    if ((metadata.mode & 0o077) !== 0) throw new Error(`${label} permissions are too broad`);
+    const bytes = await handle.readFile();
+    if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > maximumBytes) {
+      throw new Error(`${label} has an invalid size`);
+    }
+    return bytes;
+  } finally {
+    await handle?.close();
   }
-  return bytes;
 }
 
 function credentialText(bytes, label) {
@@ -40,26 +48,27 @@ export async function createEncryptedKeystoreDigestSigner({
   keystorePath,
   credentialPath,
   expectedAddress,
+  expectedOwnerUid = process.geteuid(),
   maximumKeystoreBytes = 65_536,
   maximumCredentialBytes = 4_096,
-  readFile = readFileDefault,
-  stat = statDefault,
+  open = openDefault,
   decrypt = Wallet.fromEncryptedJson,
 }) {
   const keystore = absolutePath(keystorePath, "keystore path");
   const credential = absolutePath(credentialPath, "credential path");
   const expected = getAddress(expectedAddress);
-  if (typeof readFile !== "function" || typeof stat !== "function" || typeof decrypt !== "function") {
+  if (typeof open !== "function" || typeof decrypt !== "function") {
     throw new Error("secure keystore dependencies are required");
   }
-  const keystoreLimit = positiveInteger(maximumKeystoreBytes, "maximum keystore size");
-  const credentialLimit = positiveInteger(maximumCredentialBytes, "maximum credential size");
+  const ownerUid = safeInteger(expectedOwnerUid, "expected owner uid");
+  const keystoreLimit = safeInteger(maximumKeystoreBytes, "maximum keystore size", 1);
+  const credentialLimit = safeInteger(maximumCredentialBytes, "maximum credential size", 1);
   let keystoreBytes;
   let credentialBytes;
   try {
     [keystoreBytes, credentialBytes] = await Promise.all([
-      boundedPrivateFile({ path: keystore, label: "keystore", maximumBytes: keystoreLimit, readFile, stat }),
-      boundedPrivateFile({ path: credential, label: "credential", maximumBytes: credentialLimit, readFile, stat }),
+      boundedPrivateFile({ path: keystore, label: "keystore", maximumBytes: keystoreLimit, expectedOwnerUid: ownerUid, open }),
+      boundedPrivateFile({ path: credential, label: "credential", maximumBytes: credentialLimit, expectedOwnerUid: ownerUid, open }),
     ]);
     const wallet = await decrypt(
       keystoreBytes.toString("utf8"),
@@ -86,19 +95,20 @@ export async function createEncryptedKeystoreDigestSigner({
 
 export async function createBearerCredentialAuthorizer({
   credentialPath,
+  expectedOwnerUid = process.geteuid(),
   maximumCredentialBytes = 4_096,
-  readFile = readFileDefault,
-  stat = statDefault,
+  open = openDefault,
 }) {
   const credential = absolutePath(credentialPath, "transport credential path");
+  if (typeof open !== "function") throw new Error("secure credential dependency is required");
   let source;
   try {
     source = await boundedPrivateFile({
       path: credential,
       label: "transport credential",
-      maximumBytes: positiveInteger(maximumCredentialBytes, "maximum credential size"),
-      readFile,
-      stat,
+      maximumBytes: safeInteger(maximumCredentialBytes, "maximum credential size", 1),
+      expectedOwnerUid: safeInteger(expectedOwnerUid, "expected owner uid"),
+      open,
     });
     const token = Buffer.from(credentialText(source, "transport credential"));
     if (token.length < 32) throw new Error("transport credential is too short");
