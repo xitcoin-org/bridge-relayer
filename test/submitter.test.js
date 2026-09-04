@@ -174,3 +174,34 @@ test("systemd phase one uses public CLI, denies networking and does not restart"
   assert.match(unit, /^LimitCORE=0$/m);
   assert.doesNotMatch(unit, /LoadCredential|ReadWritePaths|submitter.mjs/);
 });
+
+
+test("manifest traversal rejects higher unsafe ancestors after a trusted parent", async () => {
+  for (const ancestor of ["/etc", "/"]) {
+    for (const properties of [{ uid: 1000 }, { mode: 0o40775 }, { mode: 0o40757 },
+      { isDirectory: () => false, isSymbolicLink: () => true }]) {
+      const visited = [];
+      await assert.rejects(loadSubmitterManifest("/etc/bridge/config", {
+        openFile: () => assert.fail("opened before ancestor validation"),
+        stat: async (path) => { visited.push(path); return metadata(path === ancestor ? properties : {}); },
+      }), { message: "submitter manifest could not be loaded" });
+      assert.deepEqual(visited, ancestor === "/etc" ? ["/etc/bridge", "/etc"] : ["/etc/bridge", "/etc", "/"]);
+    }
+  }
+});
+
+test("release traversal rejects every higher unsafe ancestor after a trusted src parent", async () => {
+  const parents = [modulePath.slice(0, -"/submitter-cli.js".length),
+    `/opt/xitcoin-bridge-relayer/${"a".repeat(40)}`, "/opt/xitcoin-bridge-relayer", "/opt", "/"];
+  for (const ancestor of parents.slice(1)) {
+    for (const properties of [{ uid: 1000 }, { mode: 0o40775 }, { mode: 0o40757 },
+      { isDirectory: () => false, isSymbolicLink: () => true }]) {
+      const visited = [];
+      await assert.rejects(verifySubmitterRelease(manifest(), modulePath, {
+        resolve: async (path) => path,
+        stat: async (path) => { visited.push(path); return metadata(path === ancestor ? properties : {}); },
+      }), /unsafe parent directory/);
+      assert.deepEqual(visited, parents.slice(0, parents.indexOf(ancestor) + 1));
+    }
+  }
+});

@@ -112,6 +112,9 @@ persisted approval request against the transfer, route and authorized quorum.
 Do not mutate existing approvals, reset lifecycle state or delete pending rows
 to permit retries.
 
-Phase one leaves the store and submission helper unchanged and cannot cause
-broadcasts or lifecycle changes even when invoked repeatedly. These constraints
-are enforced by tests, alongside the existing submission and staging tests.
+Phase one leaves the store and submission helper unchanged. Source review shows
+that this runtime imports only manifest validation and filesystem reads; it has
+no store or broadcast dependency. Tests verify repeated inspection returns the
+same disabled report and repeated startup refuses, plus CLI failure handling
+and systemd network denial. These tests do not instrument network calls or
+assert that an on-disk lifecycle store remains unchanged.
