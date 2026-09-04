@@ -67,8 +67,10 @@ Operators must never delete a pending database merely to clear an error.
   and preferably on independent infrastructure and RPC providers.
 - Inject `verifySource` and `signDigest` from private runtime adapters. The
   public service neither loads nor stores private keys.
-- Pin the canonical route, Cronos chain ID, vault, maximum amount and maximum
-  deadline window independently on every signer.
+- Pin the canonical Xitcoin route and the deployed Cronos `bytes32` route ID
+  independently; never derive the deployed route from a display label. Also pin
+  the Cronos chain ID, vault, maximum amount and maximum deadline window on
+  every signer.
 - Require transport authorization before reading request bodies. Terminate TLS
   and mutual authentication in a hardened private ingress; never expose the
   approval endpoint directly to the public Internet.
