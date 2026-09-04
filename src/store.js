@@ -18,7 +18,10 @@ export class RelayStore {
         state TEXT NOT NULL,
         block_height INTEGER NOT NULL,
         block_hash TEXT NOT NULL,
+        transaction_hash TEXT,
+        event_index INTEGER,
         payload TEXT NOT NULL,
+        approval_request TEXT,
         destination_ref TEXT,
         error TEXT,
         updated_at INTEGER NOT NULL,
@@ -42,17 +45,24 @@ export class RelayStore {
           REFERENCES transfers(source_chain, source_ref)
       ) STRICT;
     `);
+    const columns = new Set(this.database.prepare("PRAGMA table_info(transfers)").all().map((column) => column.name));
+    if (!columns.has("transaction_hash")) this.database.exec("ALTER TABLE transfers ADD COLUMN transaction_hash TEXT");
+    if (!columns.has("event_index")) this.database.exec("ALTER TABLE transfers ADD COLUMN event_index INTEGER");
+    if (!columns.has("approval_request")) this.database.exec("ALTER TABLE transfers ADD COLUMN approval_request TEXT");
   }
 
   observe(record) {
     const now = Math.floor(Date.now() / 1000);
     const statement = this.database.prepare(`
       INSERT INTO transfers
-        (source_chain, source_ref, route_id, state, block_height, block_hash, payload, updated_at)
-      VALUES (?, ?, ?, 'observed', ?, ?, ?, ?)
+        (source_chain, source_ref, route_id, state, block_height, block_hash,
+         transaction_hash, event_index, payload, updated_at)
+      VALUES (?, ?, ?, 'observed', ?, ?, ?, ?, ?, ?)
       ON CONFLICT(source_chain, source_ref) DO UPDATE SET
         block_height = excluded.block_height,
         block_hash = excluded.block_hash,
+        transaction_hash = excluded.transaction_hash,
+        event_index = excluded.event_index,
         payload = excluded.payload,
         updated_at = excluded.updated_at
       WHERE transfers.state IN ('observed', 'reorged')
@@ -63,6 +73,8 @@ export class RelayStore {
       record.routeId,
       record.blockHeight,
       record.blockHash.toLowerCase(),
+      record.transactionHash?.toLowerCase() ?? null,
+      record.logIndex ?? record.messageIndex ?? null,
       JSON.stringify(record.payload),
       now,
     );
@@ -103,6 +115,30 @@ export class RelayStore {
     return this.database.prepare(
       "SELECT * FROM transfers WHERE state NOT IN ('completed', 'failed', 'reorged') ORDER BY updated_at",
     ).all();
+  }
+
+  persistApprovalRequest(sourceChain, sourceRef, request) {
+    const current = this.get(sourceChain, sourceRef);
+    if (!current || current.state !== "finalized") throw new Error("approval request requires a finalized transfer");
+    const encoded = JSON.stringify(request);
+    if (!request || typeof request !== "object" || Array.isArray(request) || encoded.length > 65_536) {
+      throw new Error("invalid approval request");
+    }
+    if (current.approval_request && current.approval_request !== encoded) {
+      throw new Error("conflicting approval request");
+    }
+    if (!current.approval_request) {
+      this.database.prepare(`
+        UPDATE transfers SET approval_request = ?, updated_at = ?
+        WHERE source_chain = ? AND source_ref = ? AND state = 'finalized' AND approval_request IS NULL
+      `).run(encoded, Math.floor(Date.now() / 1000), sourceChain, sourceRef.toLowerCase());
+    }
+    return JSON.parse(this.get(sourceChain, sourceRef).approval_request);
+  }
+
+  approvalRequest(sourceChain, sourceRef) {
+    const encoded = this.get(sourceChain, sourceRef)?.approval_request;
+    return encoded ? JSON.parse(encoded) : undefined;
   }
 
   recordApproval(sourceChain, sourceRef, approval) {

@@ -84,7 +84,31 @@ test("approval coordinator advances only after a valid quorum and is restart-saf
   const result = await approveFinalizedTransfer({ store, sourceChain: "cronos", sourceRef: record.sourceRef, request, clients, authorizedSigners: addresses, nowUnix: 1_900_000_000 });
   assert.equal(result.transfer.state, "approved");
   assert.equal(result.approvals.length, 2);
+  assert.equal(store.approvalRequest("cronos", record.sourceRef).digest, request.digest);
   const restarted = await approveFinalizedTransfer({ store, sourceChain: "cronos", sourceRef: record.sourceRef, request, clients, authorizedSigners: addresses, nowUnix: 1_900_000_000 });
   assert.equal(restarted.idempotent, true);
+  store.close();
+});
+
+test("approval coordinator never changes a persisted request after a failed quorum", async () => {
+  const store = new RelayStore();
+  const record = { sourceChain: "cronos", sourceRef: `0x${"cc".repeat(32)}`, routeId: "route", blockHeight: 10, blockHash, payload: { amount: "10" } };
+  store.observe(record);
+  store.transition("cronos", record.sourceRef, "finalized");
+  const keys = Array.from({ length: 3 }, () => new SigningKey(randomBytes(32)));
+  const addresses = keys.map((key) => computeAddress(key.publicKey));
+  const request = buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: {
+    routeId: "cronos-xitcoin-xtc-v1", sourceChainId: "25", sourceRef: record.sourceRef,
+    nonce: "7", destination: "xtc1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg32rdvg9", amount: "10", deadlineUnix: 2_000_000_000,
+  } });
+  await assert.rejects(() => approveFinalizedTransfer({
+    store, sourceChain: "cronos", sourceRef: record.sourceRef, request, clients: [], authorizedSigners: addresses, nowUnix: 1_900_000_000,
+  }), /insufficient/);
+  assert.equal(store.approvalRequest("cronos", record.sourceRef).digest, request.digest);
+  await assert.rejects(() => approveFinalizedTransfer({
+    store, sourceChain: "cronos", sourceRef: record.sourceRef,
+    request: buildApprovalRequest({ direction: DIRECTION_INBOUND, payload: { ...request.payload, deadlineUnix: 2_000_000_001 } }),
+    clients: [], authorizedSigners: addresses, nowUnix: 1_900_000_000,
+  }), /conflicting/);
   store.close();
 });

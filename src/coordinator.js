@@ -1,5 +1,6 @@
 import { FinalityViolation } from "./watchers.js";
 import { collectApprovalQuorum } from "./approvals.js";
+import { buildApprovalRequest } from "./approvals.js";
 export { submitApprovedTransfer } from "./submission.js";
 
 function height(value, label) {
@@ -25,8 +26,10 @@ export async function approveFinalizedTransfer({
     return { transfer, approvals: store.approvals(sourceChain, sourceRef), idempotent: true };
   }
   if (transfer.state !== "finalized") throw new Error("only finalized transfers may be approved");
+  const canonicalRequest = buildApprovalRequest(request);
+  const persistedRequest = store.persistApprovalRequest(sourceChain, sourceRef, canonicalRequest);
   const approvals = await collectApprovalQuorum({
-    clients, request, authorizedSigners, threshold, nowUnix,
+    clients, request: persistedRequest, authorizedSigners, threshold, nowUnix,
   });
   for (const approval of approvals) store.recordApproval(sourceChain, sourceRef, approval);
   const approved = store.transition(sourceChain, sourceRef, "approved");
