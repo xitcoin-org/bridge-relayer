@@ -49,6 +49,7 @@ test("loads bounded private key material and signs only with the expected accoun
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
+    expectedCredentialOwnerUid: OWNER_UID,
     open: mockOpen(files),
     decrypt: async (json, password) => {
       assert.equal(json, '{"encrypted":true}');
@@ -76,6 +77,7 @@ test("decrypts a real Web3 keystore through the default adapter", async () => {
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
+    expectedCredentialOwnerUid: OWNER_UID,
     open: mockOpen(files),
   });
   assert.equal(recoverAddress(DIGEST, await signer.signDigest(DIGEST)), ADDRESS);
@@ -125,6 +127,7 @@ test("rejects wrong accounts, broad permissions, oversized files and relative pa
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
+    expectedCredentialOwnerUid: OWNER_UID,
     open: mockOpen(files),
     decrypt: async () => ({ address: computeAddress(new SigningKey(`0x${"32".repeat(32)}`).publicKey), signingKey: KEY }),
   };
@@ -148,6 +151,7 @@ test("rejects unexpected owners and symbolic links without exposing their paths"
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
+    expectedCredentialOwnerUid: OWNER_UID,
     decrypt: async () => ({ address: ADDRESS, signingKey: KEY }),
   };
   await assert.rejects(
@@ -171,6 +175,7 @@ test("authorizes a constant-time bearer credential without exposing it", async (
   const files = new Map([["/run/credentials/transport-token", source]]);
   const authorize = await createBearerCredentialAuthorizer({
     credentialPath: "/run/credentials/transport-token",
+    expectedOwnerUid: OWNER_UID,
     open: mockOpen(files),
   });
   assert.equal(await authorize({ headers: { authorization: `Bearer ${secret}` } }), true);
@@ -194,6 +199,7 @@ test("rejects short, broadly readable or wrongly owned transport credentials", a
   const files = new Map([["/run/credentials/transport-token", source]]);
   const base = {
     credentialPath: "/run/credentials/transport-token",
+    expectedOwnerUid: OWNER_UID,
     open: mockOpen(files),
   };
   await assert.rejects(() => createBearerCredentialAuthorizer(base), /could not be loaded/);

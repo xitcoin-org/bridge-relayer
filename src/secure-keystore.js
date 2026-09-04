@@ -125,7 +125,7 @@ export async function createEncryptedKeystoreDigestSigner({
 
 export async function createBearerCredentialAuthorizer({
   credentialPath,
-  expectedOwnerUid = process.geteuid(),
+  expectedOwnerUid = 0,
   maximumCredentialBytes = 4_096,
   open = openDefault,
 }) {
