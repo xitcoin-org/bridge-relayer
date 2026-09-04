@@ -11,7 +11,8 @@
     "check": "node --check src/*.js test/*.js",
     "test": "node --test",
     "vectors": "node src/vectors.js",
-    "preflight:testnet": "node src/preflight-cli.js"
+    "preflight:testnet": "node src/preflight-cli.js",
+    "signer:start": "node src/signer-cli.js"
   },
   "license": "MIT",
   "dependencies": {
