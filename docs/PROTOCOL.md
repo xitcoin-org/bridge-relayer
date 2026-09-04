@@ -3,8 +3,15 @@
 ## Route identity
 
 The human-readable route identifier is a lower-case string accepted by the
-Xitcoin bridge module. The Cronos vault stores its `bytes32` representation as
-`keccak256(UTF8(route_id))`. Deployments must publish both values.
+Xitcoin bridge module. The Cronos vault stores a deployment-pinned `bytes32`
+route identifier. A deployment must publish and bind both values explicitly;
+the relayer must never assume that the deployed Cronos value can be derived
+from the Xitcoin display identifier.
+
+For the canonical testnet deployment, the Xitcoin route is
+`cronos-testnet-xitcoin-testnet`, while the Cronos route is
+`0x21121c16b53a726056a6683f00c7eb4da5501ce8a2abc8a4677e06f1e94b5cd9`
+on Cronos EVM chain ID `338`.
 
 ## Cronos to Xitcoin
 
