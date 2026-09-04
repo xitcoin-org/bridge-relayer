@@ -13,7 +13,6 @@ test("loads three distinct systemd credentials for canonical loopback signers", 
   const clients = await createCredentialedSignerClients({
     signers,
     credentialsDirectory: "/run/credentials/coordinator",
-    expectedOwnerUid: 1001,
     loadHeader: async (options) => {
       loaded.push(options);
       return async () => `Bearer ${"a".repeat(32)}`;
@@ -23,7 +22,7 @@ test("loads three distinct systemd credentials for canonical loopback signers", 
   assert.equal(clients.length, 3);
   assert.deepEqual(loaded, [1, 2, 3].map((index) => ({
     credentialPath: `/run/credentials/coordinator/signer-${index}-transport-token`,
-    expectedOwnerUid: 1001,
+    expectedOwnerUid: 0,
   })));
   assert.deepEqual(clients.map((client) => client.identity), ["signer-1", "signer-2", "signer-3"]);
   assert.ok(clients.every((client) => client.allowHttp === true));

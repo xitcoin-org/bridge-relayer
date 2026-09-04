@@ -31,7 +31,7 @@ function signerDefinitions(values) {
 export async function createCredentialedSignerClients({
   signers,
   credentialsDirectory,
-  expectedOwnerUid = process.geteuid(),
+  expectedOwnerUid = 0,
   loadHeader = createBearerCredentialHeader,
   clientFactory = (options) => new RemoteSignerClient(options),
   fetchImpl = globalThis.fetch,
