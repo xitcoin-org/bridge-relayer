@@ -72,8 +72,12 @@ test("rejects duplicate, unauthorized, expired and wrong-domain approvals", asyn
 test("remote signer transport requires safe URLs and bounded JSON", async () => {
   assert.throws(() => new RemoteSignerClient({ url: "http://signer.example", identity: "one" }), /HTTPS/);
   assert.throws(() => new RemoteSignerClient({ url: "https://user:secret@signer.example", identity: "one" }), /credentials/);
+  let observedAuthorization;
   const client = new RemoteSignerClient({ url: "http://127.0.0.1:9000/approve", identity: "local-test", allowHttp: true,
-    fetchImpl: async () => ({ ok: true, status: 200, headers: { get: () => "2" }, async text() { return "{}"; } }),
+    authorizationHeader: async () => `Bearer ${"a".repeat(32)}`,
+    fetchImpl: async (_url, options) => { observedAuthorization = options.headers.authorization; return ({ ok: true, status: 200, headers: { get: () => "2" }, async text() { return "{}"; } }); },
   });
   assert.deepEqual(await client.approve(inbound()), {});
+  assert.equal(observedAuthorization, `Bearer ${"a".repeat(32)}`);
+  assert.throws(() => new RemoteSignerClient({ url: "https://signer.example", identity: "one" }), /authentication/);
 });

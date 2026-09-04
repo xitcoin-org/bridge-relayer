@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { SigningKey, computeAddress, encryptKeystoreJsonSync, recoverAddress } from "ethers";
 
-import { createBearerCredentialAuthorizer, createEncryptedKeystoreDigestSigner } from "../src/secure-keystore.js";
+import { createBearerCredentialAuthorizer, createBearerCredentialHeader, createEncryptedKeystoreDigestSigner } from "../src/secure-keystore.js";
 
 const KEY = new SigningKey(`0x${"31".repeat(32)}`);
 const ADDRESS = computeAddress(KEY.publicKey);
@@ -129,6 +129,17 @@ test("authorizes a constant-time bearer credential without exposing it", async (
   assert.equal(await authorize({ headers: { authorization: `Bearer ${secret}` } }), true);
   assert.equal(await authorize({ headers: { authorization: `Bearer ${"x".repeat(48)}` } }), false);
   assert.equal(await authorize({ headers: {} }), false);
+});
+
+test("loads a bounded bearer header for an authenticated coordinator client", async () => {
+  const token = "c".repeat(32);
+  const path = "/run/credentials/signer-1-transport-token";
+  const authorizationHeader = await createBearerCredentialHeader({
+    credentialPath: path,
+    expectedOwnerUid: 1001,
+    open: mockOpen(new Map([[path, Buffer.from(token)]]), { uid: 1001, mode: 0o100400 }),
+  });
+  assert.equal(await authorizationHeader(), `Bearer ${token}`);
 });
 
 test("rejects short, broadly readable or wrongly owned transport credentials", async () => {
