@@ -32,7 +32,10 @@ function mockOpenOwners(files, owners, mode = 0o100600) {
     const source = files.get(path);
     if (!source) throw new Error("missing fixture");
     return {
-      async stat() { return privateStat(source.length, mode, owners.get(path)); },
+      async stat() {
+        const fileMode = mode instanceof Map ? mode.get(path) : mode;
+        return privateStat(source.length, fileMode, owners.get(path));
+      },
       async readFile() { return Buffer.from(source); },
       async close() {},
       flags,
@@ -96,7 +99,11 @@ test("accepts a service-owned keystore with a root-owned systemd credential", as
     credentialPath,
     expectedAddress: ADDRESS,
     expectedOwnerUid: serviceUid,
-    open: mockOpenOwners(files, new Map([[keystorePath, serviceUid], [credentialPath, 0]])),
+    open: mockOpenOwners(
+      files,
+      new Map([[keystorePath, serviceUid], [credentialPath, 0]]),
+      new Map([[keystorePath, 0o100600], [credentialPath, 0o100440]]),
+    ),
     decrypt: async () => ({ address: ADDRESS, signingKey: KEY }),
   });
   assert.equal(signer.signerAddress, ADDRESS);
@@ -108,11 +115,19 @@ test("accepts only a root-owned systemd bearer credential by default", async () 
   const files = new Map([[path, Buffer.from(token)]]);
   const authorize = await createBearerCredentialAuthorizer({
     credentialPath: path,
-    open: mockOpen(files, { uid: 0 }),
+    open: mockOpen(files, { uid: 0, mode: 0o100440 }),
   });
   assert.equal(await authorize({ headers: { authorization: `Bearer ${token}` } }), true);
   await assert.rejects(
     () => createBearerCredentialAuthorizer({ credentialPath: path, open: mockOpen(files, { uid: 1001 }) }),
+    /could not be loaded/,
+  );
+  await assert.rejects(
+    () => createBearerCredentialAuthorizer({ credentialPath: path, open: mockOpen(files, { uid: 0, mode: 0o100460 }) }),
+    /could not be loaded/,
+  );
+  await assert.rejects(
+    () => createBearerCredentialAuthorizer({ credentialPath: path, open: mockOpen(files, { uid: 0, mode: 0o100444 }) }),
     /could not be loaded/,
   );
 });
