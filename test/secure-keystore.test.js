@@ -8,9 +8,23 @@ import { createBearerCredentialAuthorizer, createEncryptedKeystoreDigestSigner }
 const KEY = new SigningKey(`0x${"31".repeat(32)}`);
 const ADDRESS = computeAddress(KEY.publicKey);
 const DIGEST = `0x${"ab".repeat(32)}`;
+const OWNER_UID = process.geteuid();
 
-function privateStat(size, mode = 0o100600) {
-  return { size, mode, isFile: () => true };
+function privateStat(size, mode = 0o100600, uid = OWNER_UID) {
+  return { size, mode, uid, isFile: () => true };
+}
+
+function mockOpen(files, { mode = 0o100600, uid = OWNER_UID } = {}) {
+  return async (path, flags) => {
+    const source = files.get(path);
+    if (!source) throw new Error("missing fixture");
+    return {
+      async stat() { return privateStat(source.length, mode, uid); },
+      async readFile() { return Buffer.from(source); },
+      async close() {},
+      flags,
+    };
+  };
 }
 
 test("loads bounded private key material and signs only with the expected account", async () => {
@@ -22,8 +36,7 @@ test("loads bounded private key material and signs only with the expected accoun
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
-    readFile: async (path) => Buffer.from(files.get(path)),
-    stat: async (path) => privateStat(files.get(path).length),
+    open: mockOpen(files),
     decrypt: async (json, password) => {
       assert.equal(json, '{"encrypted":true}');
       assert.equal(password, "correct horse battery staple");
@@ -50,20 +63,22 @@ test("decrypts a real Web3 keystore through the default adapter", async () => {
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
-    readFile: async (path) => Buffer.from(files.get(path)),
-    stat: async (path) => privateStat(files.get(path).length),
+    open: mockOpen(files),
   });
   assert.equal(recoverAddress(DIGEST, await signer.signDigest(DIGEST)), ADDRESS);
 });
 
 test("rejects wrong accounts, broad permissions, oversized files and relative paths without leaking details", async () => {
   const bytes = Buffer.from("private material");
+  const files = new Map([
+    ["/keys/signer.json", bytes],
+    ["/run/credentials/keystore-password", bytes],
+  ]);
   const options = {
     keystorePath: "/keys/signer.json",
     credentialPath: "/run/credentials/keystore-password",
     expectedAddress: ADDRESS,
-    readFile: async () => Buffer.from(bytes),
-    stat: async () => privateStat(bytes.length),
+    open: mockOpen(files),
     decrypt: async () => ({ address: computeAddress(new SigningKey(`0x${"32".repeat(32)}`).publicKey), signingKey: KEY }),
   };
   await assert.rejects(() => createEncryptedKeystoreDigestSigner(options), (error) => {
@@ -71,31 +86,65 @@ test("rejects wrong accounts, broad permissions, oversized files and relative pa
     assert.doesNotMatch(error.message, /private material|expected signer/i);
     return true;
   });
-  await assert.rejects(() => createEncryptedKeystoreDigestSigner({ ...options, stat: async () => privateStat(bytes.length, 0o100644) }), /could not be loaded/);
+  await assert.rejects(() => createEncryptedKeystoreDigestSigner({ ...options, open: mockOpen(files, { mode: 0o100644 }) }), /could not be loaded/);
   await assert.rejects(() => createEncryptedKeystoreDigestSigner({ ...options, maximumKeystoreBytes: 4 }), /could not be loaded/);
   await assert.rejects(() => createEncryptedKeystoreDigestSigner({ ...options, keystorePath: "relative.json" }), /absolute path/);
+});
+
+test("rejects unexpected owners and symbolic links without exposing their paths", async () => {
+  const source = Buffer.from("private material");
+  const files = new Map([
+    ["/keys/signer.json", source],
+    ["/run/credentials/keystore-password", source],
+  ]);
+  const base = {
+    keystorePath: "/keys/signer.json",
+    credentialPath: "/run/credentials/keystore-password",
+    expectedAddress: ADDRESS,
+    decrypt: async () => ({ address: ADDRESS, signingKey: KEY }),
+  };
+  await assert.rejects(
+    () => createEncryptedKeystoreDigestSigner({ ...base, open: mockOpen(files, { uid: OWNER_UID + 1 }) }),
+    /could not be loaded/,
+  );
+  const symbolicLinkOpen = async () => {
+    const error = new Error("refused symbolic link /secret/path");
+    error.code = "ELOOP";
+    throw error;
+  };
+  await assert.rejects(
+    () => createEncryptedKeystoreDigestSigner({ ...base, open: symbolicLinkOpen }),
+    (error) => error.message === "signer key material could not be loaded" && !error.message.includes("/secret/path"),
+  );
 });
 
 test("authorizes a constant-time bearer credential without exposing it", async () => {
   const secret = "t".repeat(48);
   const source = Buffer.from(`${secret}\n`);
+  const files = new Map([["/run/credentials/transport-token", source]]);
   const authorize = await createBearerCredentialAuthorizer({
     credentialPath: "/run/credentials/transport-token",
-    readFile: async () => Buffer.from(source),
-    stat: async () => privateStat(source.length),
+    open: mockOpen(files),
   });
   assert.equal(await authorize({ headers: { authorization: `Bearer ${secret}` } }), true);
   assert.equal(await authorize({ headers: { authorization: `Bearer ${"x".repeat(48)}` } }), false);
   assert.equal(await authorize({ headers: {} }), false);
 });
 
-test("rejects short or broadly readable transport credentials", async () => {
+test("rejects short, broadly readable or wrongly owned transport credentials", async () => {
   const source = Buffer.from("too-short");
+  const files = new Map([["/run/credentials/transport-token", source]]);
   const base = {
     credentialPath: "/run/credentials/transport-token",
-    readFile: async () => Buffer.from(source),
-    stat: async () => privateStat(source.length),
+    open: mockOpen(files),
   };
   await assert.rejects(() => createBearerCredentialAuthorizer(base), /could not be loaded/);
-  await assert.rejects(() => createBearerCredentialAuthorizer({ ...base, stat: async () => privateStat(source.length, 0o100640) }), /could not be loaded/);
+  await assert.rejects(
+    () => createBearerCredentialAuthorizer({ ...base, open: mockOpen(files, { mode: 0o100640 }) }),
+    /could not be loaded/,
+  );
+  await assert.rejects(
+    () => createBearerCredentialAuthorizer({ ...base, open: mockOpen(files, { uid: OWNER_UID + 1 }) }),
+    /could not be loaded/,
+  );
 });
