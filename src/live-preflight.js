@@ -71,8 +71,10 @@ export function createHostInspectors({ exec = execFile, statPath = stat, readPas
     },
 
     async inspectService(name) {
-      const unit = `xitcoin-bridge-${name}.service`;
-      const check = async (verb) => {
+      const units = [`xitcoin-bridge-${name}.service`];
+      const signer = /^signer-([123])$/.exec(name);
+      if (signer) units.push(`xitcoin-bridge-signer@${signer[1]}.service`);
+      const check = async (verb, unit) => {
         try {
           const { stdout } = await exec("systemctl", [verb, unit], { encoding: "utf8" });
           return stdout.trim();
@@ -80,8 +82,14 @@ export function createHostInspectors({ exec = execFile, statPath = stat, readPas
           return String(error?.stdout ?? "").trim();
         }
       };
-      const [active, enabled] = await Promise.all([check("is-active"), check("is-enabled")]);
-      return { active: active === "active", enabled: enabled === "enabled" };
+      const states = await Promise.all(units.flatMap((unit) => [
+        check("is-active", unit),
+        check("is-enabled", unit),
+      ]));
+      return {
+        active: states.some((state, index) => index % 2 === 0 && state === "active"),
+        enabled: states.some((state, index) => index % 2 === 1 && state === "enabled"),
+      };
     },
   });
 }

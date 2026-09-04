@@ -46,6 +46,23 @@ test("host inspectors reject interactive and unlocked identities", async () => {
   assert.deepEqual(await inspectors.inspectIdentity("bridge"), { exists: true, locked: false, interactive: true });
 });
 
+test("host inspectors detect both legacy and instantiated signer units", async () => {
+  const calls = [];
+  const inspectors = createHostInspectors({
+    exec: async (command, arguments_) => {
+      calls.push([command, ...arguments_]);
+      const unit = arguments_[1];
+      if (unit === "xitcoin-bridge-signer@1.service" && arguments_[0] === "is-active") {
+        return { stdout: "active\n" };
+      }
+      return { stdout: "inactive\n" };
+    },
+  });
+  assert.deepEqual(await inspectors.inspectService("signer-1"), { active: true, enabled: false });
+  assert.ok(calls.some((call) => call.includes("xitcoin-bridge-signer-1.service")));
+  assert.ok(calls.some((call) => call.includes("xitcoin-bridge-signer@1.service")));
+});
+
 test("live network probe requires identical Cronos vault state", async () => {
   const providers = [{ getCode: async () => "0x01" }, { getCode: async () => "0x01" }];
   let created = 0;
