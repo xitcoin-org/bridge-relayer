@@ -120,6 +120,18 @@ test("CometBFT client rejects wrong networks, oversized responses and embedded c
   }), /credentials/);
 });
 
+test("default CometBFT transport does not depend on global fetch", () => {
+  const adapter = new CometBftHttpClient({
+    url: "https://rpc-a.example.test",
+    chainId: "xitcoin-testnet-v2-1",
+    decodeBlock: () => [],
+    decodeTransaction: () => [],
+  });
+
+  assert.equal(typeof adapter.fetch, "function");
+  assert.notEqual(adapter.fetch, globalThis.fetch);
+});
+
 test("Xitcoin client collection requires independent HTTPS origins", () => {
   const options = {
     chainId: "xitcoin-testnet-v2-1",

@@ -61,6 +61,31 @@ export async function connectCronosProviders({
   return providers;
 }
 
+async function fetchWithEthers(target, { headers = {} } = {}, timeoutMs = 10_000) {
+  const request = new FetchRequest(target.toString());
+  request.method = "GET";
+  request.timeout = positiveInteger(timeoutMs, "timeout");
+
+  for (const [name, value] of Object.entries(headers)) {
+    request.setHeader(name, value);
+  }
+
+  const response = await request.send();
+
+  return Object.freeze({
+    ok: response.statusCode >= 200 && response.statusCode < 300,
+    status: response.statusCode,
+    headers: Object.freeze({
+      get(name) {
+        return response.headers[String(name).toLowerCase()] ?? null;
+      },
+    }),
+    async text() {
+      return response.bodyText;
+    },
+  });
+}
+
 export class CometBftHttpClient {
   constructor({
     url,
@@ -70,20 +95,20 @@ export class CometBftHttpClient {
     timeoutMs = 10_000,
     maxResponseBytes = 8 * 1024 * 1024,
     allowHttp = false,
-    fetchImpl = globalThis.fetch,
+    fetchImpl = null,
   }) {
     if (!chainId) throw new Error("Xitcoin chain ID is required");
     if (typeof decodeBlock !== "function" || typeof decodeTransaction !== "function") {
       throw new Error("canonical Xitcoin decoders are required");
     }
-    if (typeof fetchImpl !== "function") throw new Error("fetch implementation is required");
+    if (fetchImpl !== null && typeof fetchImpl !== "function") throw new Error("fetch implementation is invalid");
     this.url = normalizeUrl(url, { allowHttp });
     this.chainId = String(chainId);
     this.decodeBlock = decodeBlock;
     this.decodeTransaction = decodeTransaction;
     this.timeoutMs = positiveInteger(timeoutMs, "timeout");
     this.maxResponseBytes = positiveInteger(maxResponseBytes, "maximum response size");
-    this.fetch = fetchImpl;
+    this.fetch = fetchImpl ?? ((target, options) => fetchWithEthers(target, options, this.timeoutMs));
   }
 
   async request(path, parameters = {}) {
