@@ -77,6 +77,28 @@ Operators must never delete a pending database merely to clear an error.
 - Treat source disagreement, a mismatched digest, a wrong signing account or an
   expired request as a hard rejection and emit no signature.
 
+## Encrypted signer credentials
+
+- Pass the keystore password with `LoadCredentialEncrypted=` and read it only
+  from the service's runtime credential directory. Do not pass passwords in an
+  environment variable, command-line argument, unit file or persistent wrapper.
+- Keep the encrypted JSON keystore and runtime credential owned by the signer
+  service identity and owner-private. The secure loader opens each absolute path
+  with `O_NOFOLLOW`, checks the effective owner UID, rejects non-regular files,
+  group/world access, empty input and oversized input before decryption.
+- Pin the expected signer address independently from the keystore. A successful
+  decryption with any other account is a hard startup failure.
+- Keep core dumps disabled and logs sanitized. The loader intentionally reports
+  a bounded failure code instead of the keystore path, password, decrypted
+  account or underlying decryption error.
+- A transport bearer credential must be independent from the keystore password,
+  be generated from at least 32 cryptographically random bytes and be supplied
+  as a separate encrypted systemd credential. The loader enforces the resulting
+  token length; comparison is constant-time for equal-length candidates.
+- Loading key material does not authorize a signature. Route policy, request
+  bounds and independent canonical source verification still run before every
+  digest signing operation.
+
 ## Activation sequence
 
 Protocol vectors, watcher tests, signer isolation tests, testnet deployment,
