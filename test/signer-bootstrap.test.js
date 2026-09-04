@@ -10,7 +10,8 @@ const CONFIG = Object.freeze({
   keystorePath: "/var/lib/xitcoin-bridge/signer-1/keystore.json",
   listen: { host: "127.0.0.1", port: 43101 },
   policy: {
-    routeId: "cronos-xitcoin-xtc-v1",
+    routeId: "cronos-testnet-xitcoin-testnet",
+    cronosRouteId: "0x21121c16b53a726056a6683f00c7eb4da5501ce8a2abc8a4677e06f1e94b5cd9",
     cronosChainId: 338,
     cronosVault: "0x1111111111111111111111111111111111111111",
     maximumAmount: "1000",
@@ -32,10 +33,13 @@ test("accepts only a strict pinned testnet signer configuration", () => {
   const config = validateSignerConfig(CONFIG);
   assert.equal(config.identity, "signer-1");
   assert.equal(config.policy.cronosChainId, 338);
+  assert.equal(config.policy.cronosRouteId, "0x21121c16b53a726056a6683f00c7eb4da5501ce8a2abc8a4677e06f1e94b5cd9");
   assert.equal(config.xitcoin.chainId, "xitcoin-testnet-v2-1");
   assert.throws(() => validateSignerConfig({ ...CONFIG, unexpected: true }), /unsupported/);
   assert.throws(() => validateSignerConfig({ ...CONFIG, identity: "signer-4" }), /canonical/);
   assert.throws(() => validateSignerConfig({ ...CONFIG, policy: { ...CONFIG.policy, cronosChainId: 25 } }), /must be 338/);
+  assert.throws(() => validateSignerConfig({ ...CONFIG, policy: { ...CONFIG.policy, routeId: "cronos-xitcoin-xtc-v1" } }), /not canonical/);
+  assert.throws(() => validateSignerConfig({ ...CONFIG, policy: { ...CONFIG.policy, cronosRouteId: `0x${"66".repeat(32)}` } }), /not canonical/);
   assert.throws(() => validateSignerConfig({ ...CONFIG, xitcoin: { ...CONFIG.xitcoin, chainId: "wrong" } }), /not canonical/);
 });
 
@@ -82,7 +86,9 @@ test("composes both independent watchers and starts only after credentials load"
   assert.equal(runtime.server, fakeServer);
   assert.equal(calls.find(([name]) => name === "cronos")[1].chainId, 338);
   assert.equal(calls.find(([name]) => name === "xitcoin")[1].allowHttp, true);
+  assert.equal(calls.find(([name]) => name === "verifier")[1].cronosRouteId, CONFIG.policy.cronosRouteId);
   assert.equal(calls.find(([name]) => name === "service")[1].keystoreCredentialPath, "/run/credentials/xitcoin-bridge-signer-1.service/keystore-password");
   assert.equal(calls.find(([name]) => name === "handler")[1].transportCredentialPath, "/run/credentials/xitcoin-bridge-signer-1.service/transport-token");
   assert.deepEqual(calls.find(([name]) => name === "server")[1].host, "127.0.0.1");
+  assert.equal(calls.find(([name]) => name === "verifier")[1].cronosWatcher.routeId, CONFIG.policy.cronosRouteId);
 });
