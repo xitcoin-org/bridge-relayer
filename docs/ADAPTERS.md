@@ -145,3 +145,9 @@ bridge route; no live endpoint was queried. `mayBroadcast` remains false.
 Coordinator source evidence is structurally validated when supplied, but remains
 external to the attestation wire message and its digest. Independent source
 finality validation is still mandatory before any runtime submission.
+
+The optional `test/reference/verify-xitcoin-protobuf.py` independently constructs
+a descriptor from the pinned proto with Python protobuf 6.33.5, decodes the
+synthetic fixture and deterministically re-encodes identical bytes. This check
+was executed in an isolated temporary environment; protobuf is not a runtime
+relayer dependency. It does not replace a chain-generated signing vector.
