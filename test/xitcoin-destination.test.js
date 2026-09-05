@@ -42,3 +42,12 @@ test("untrusted object traps, excess data and raw errors never escape", () => {
   rejected({ ...inbound(), approvals: new Array(3) });
   assert.equal(calls, 0);
 });
+
+test("coordinator numeric deadline and bounded source evidence preserve message bytes", () => {
+  const plain = inbound();
+  const enriched = inbound({ deadlineUnix: 2_000_000_000, sourceEvidence: {
+    blockHeight: 7, blockHash: `0x${"aa".repeat(32)}`, transactionHash: `0x${"bb".repeat(32)}`, eventIndex: 0,
+  } });
+  assert.deepEqual(prepareXitcoinAttestation(enriched), prepareXitcoinAttestation(plain));
+  rejected(inbound({ sourceEvidence: { blockHeight: -1 } }));
+});

@@ -61,3 +61,15 @@ export function verifiedDestinationQuorum(request, approvals, authorizedSigners,
   if (new Set(verified.map((a) => a.signer)).size !== verified.length) throw new Error();
   return Object.freeze(verified);
 }
+
+export function validateSourceEvidence(value) {
+  exactFields(value, ["blockHeight", "blockHash", "transactionHash", "eventIndex"]);
+  if (!Number.isSafeInteger(value.blockHeight) || value.blockHeight < 1
+      || !Number.isSafeInteger(value.eventIndex) || value.eventIndex < 0
+      || !/^0x[0-9a-f]{64}$/.test(value.blockHash)
+      || !/^0x[0-9a-f]{64}$/.test(value.transactionHash)) throw new Error();
+}
+
+export function decimalOrSafeInteger(value, bits) {
+  return decimal(typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value, bits);
+}

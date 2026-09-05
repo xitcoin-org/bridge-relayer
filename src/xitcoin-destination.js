@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { bech32Encode } from "./address.js";
 import { attestationId, DIRECTION_INBOUND } from "./protocol.js";
-import { destinationSnapshot, exactFields, decimal, verifiedDestinationQuorum } from "./destination-validation.js";
+import { destinationSnapshot, exactFields, decimal, decimalOrSafeInteger, validateSourceEvidence, verifiedDestinationQuorum } from "./destination-validation.js";
 
 export const XITCOIN_MESSAGE_TYPE = "/cosmos.evm.bridge.v1.MsgSubmitAttestation";
 const ROUTE = "cronos-testnet-xitcoin-testnet";
@@ -35,11 +35,12 @@ export function prepareXitcoinAttestation(input) {
     const { request, approvals, authorizedSigners, submitter, nowUnix } = value;
     if (value.chainId !== "xitcoin-testnet-v2-1" || request.direction !== DIRECTION_INBOUND) throw new Error();
     const p = request.payload;
-    exactFields(p, ["routeId", "sourceChainId", "sourceRef", "nonce", "destination", "amount", "deadlineUnix"]);
+    exactFields(p, ["routeId", "sourceChainId", "sourceRef", "nonce", "destination", "amount", "deadlineUnix", ...(Object.hasOwn(p, "sourceEvidence") ? ["sourceEvidence"] : [])]);
+    if (Object.hasOwn(p, "sourceEvidence")) validateSourceEvidence(p.sourceEvidence);
     if (p.routeId !== ROUTE || p.sourceChainId !== "338" || !/^0x[0-9a-f]{64}$/.test(p.sourceRef)) throw new Error();
     const nonce = decimal(p.nonce, 64);
     decimal(p.amount, 256);
-    const deadline = decimal(p.deadlineUnix, 63);
+    const deadline = decimalOrSafeInteger(p.deadlineUnix, 63);
     // Current approval protocol uses safe-integer Unix seconds; never silently round.
     if (deadline > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error();
     address(submitter); address(p.destination);

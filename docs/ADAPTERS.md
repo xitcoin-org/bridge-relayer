@@ -127,7 +127,7 @@ transaction hash**. Chain ID is plan metadata; this message schema has no
 chain-ID field for the destination. Transaction-level binding is still missing.
 
 Local stricter policy requires canonical decimal strings, positive uint64 nonce,
-positive uint256 amount, safe-integer positive int64 deadline, canonical 20-byte
+positive uint256 amount, safe-integer positive int64 deadline (decimal string or safe numeric Unix seconds), canonical 20-byte
 `xtc` addresses and 2–3 signatures. This intentionally rejects some representations
 the chain may normalize. The fixture uses synthetic public keys, not chain
 transactions; its byte layout is checked against the pinned generated Go encoder.
@@ -141,3 +141,7 @@ fees, execution response handling or finality verifier. None is fabricated here.
 Testnets commit `1633957e805f6782b201a623335c9eebafa0cece`,
 `xitcoin-testnet-v2-1/chain.json`, identifies `axtc` and a disabled, unconfigured
 bridge route; no live endpoint was queried. `mayBroadcast` remains false.
+
+Coordinator source evidence is structurally validated when supplied, but remains
+external to the attestation wire message and its digest. Independent source
+finality validation is still mandatory before any runtime submission.
