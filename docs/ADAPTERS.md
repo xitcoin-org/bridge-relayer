@@ -178,3 +178,12 @@ errors. Its injected reader must honor abort and enforce endpoint identity and
 redirect rules. No actual transport, broadcast-response semantic parser, status
 lookup, independent receipt source or finality policy is connected. Every new
 entrypoint remains outside operational startup.
+The optional `test/reference/verify-xitcoin-protobuf.py` independently constructs
+a descriptor from the pinned proto with Python protobuf 6.33.5, decodes the
+synthetic fixture and deterministically re-encodes identical bytes. This check
+was executed in an isolated temporary environment; protobuf is not a runtime
+relayer dependency. It does not replace a chain-generated signing vector.
+
+The shared streamed reader also caps read operations: endless immediately resolved
+empty chunks cannot starve the timer without exhausting a byte budget. This
+fail-closed cap applies to signer responses as well as destination fixtures.
