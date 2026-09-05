@@ -16,7 +16,7 @@ corruption or modification, not network control. It did not grant send permissio
 A regression failed before the fix. Inspection now decodes and canonically
 re-encodes the release call, binds its burn ID and EIP-712 approval digest,
 checks zero transaction value and basic approval shape, and rejects malformed
-bytes before transaction parsing. The corrected integration passes 230 tests.
+bytes before transaction parsing. The corrected integration passes 231 tests.
 
 ## Verified behavior and limits
 
