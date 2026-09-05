@@ -1,0 +1,25 @@
+syntax = "proto3";
+package cosmos.evm.bridge.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/xitcoin-org/pos-chain/x/bridge/types";
+
+// Query exposes canonical, read-only bridge settlement state.
+service Query {
+  // AttestationStatus reports whether an attestation replay key was consumed.
+  rpc AttestationStatus(QueryAttestationStatusRequest)
+      returns (QueryAttestationStatusResponse) {
+    option (google.api.http).get =
+        "/cosmos/evm/bridge/v1/attestations/{attestation_id}";
+  }
+}
+
+message QueryAttestationStatusRequest {
+  string attestation_id = 1;
+}
+
+message QueryAttestationStatusResponse {
+  string attestation_id = 1;
+  bool processed = 2;
+}

@@ -66,6 +66,10 @@ disabled. Check success is not readiness, preflight success or authorization.
 
 ### Xitcoin
 
+Update: [phase-two evidence and offline components](ADAPTERS.md) identify the
+canonical message and replay-query schemas now verified in the chain repository.
+The following missing-schema statement describes the phase-one relayer tree.
+
 `buildXitcoinSubmission` builds attestation fields, not a signed chain
 transaction. The repository does not contain the canonical protobuf definition
 and type URL for `MsgSubmitAttestation`, field-number/type mappings, signature

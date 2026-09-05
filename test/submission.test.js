@@ -56,7 +56,7 @@ test("submits once, waits for finality and completes idempotently", async () => 
   const store = approvedStore(inbound);
   let submissions = 0;
   const adapter = {
-    async status() { return { processed: false }; },
+    async status() { return { processed: false, mayBroadcast: true }; },
     async submit() { submissions += 1; return tx; },
     async confirm() { return { finalized: true, canonical: true }; },
   };
@@ -83,10 +83,31 @@ test("recovers a processed destination after a crash without rebroadcasting", as
 
 test("keeps a submitted transfer pending and rejects a destination mismatch", async () => {
   const store = approvedStore(inbound);
-  const adapter = { async status() { return { processed: false }; }, async submit() { return tx; }, async confirm() { return { finalized: false }; } };
+  const adapter = { async status() { return { processed: false, mayBroadcast: true }; }, async submit() { return tx; }, async confirm() { return { finalized: false }; } };
   const pending = await submitApprovedTransfer({ store, sourceChain: "cronos", sourceRef: ref, request: inbound, adapter });
   assert.equal(pending.transfer.state, "submitted");
   adapter.confirm = async () => ({ finalized: true, canonical: false });
   await assert.rejects(() => submitApprovedTransfer({ store, sourceChain: "cronos", sourceRef: ref, request: inbound, adapter }), DestinationViolation);
   store.close();
 });
+
+for (const status of [undefined, null, {}, { processed: false }, { processed: false, mayBroadcast: false },
+  { processed: false, mayBroadcast: "true" }, { processed: false, mayBroadcast: 1 },
+  Object.create({ processed: false, mayBroadcast: true }),
+  { get processed() { throw new Error("secret"); }, mayBroadcast: true },
+  new Proxy({ processed: false, mayBroadcast: true }, {}),
+  new Proxy({}, { get() { throw new Error("secret"); } }),
+  { processed: false, get mayBroadcast() { throw new Error("secret"); } }]) {
+  test("absent or invalid authorization cannot submit, including repeated attempts", async () => {
+    const store = approvedStore(inbound);
+    let submissions = 0;
+    const adapter = { async status() { return status; }, async submit() { submissions++; return tx; } };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await assert.rejects(submitApprovedTransfer({ store, sourceChain: "cronos", sourceRef: ref, request: inbound, adapter }),
+        { message: "destination broadcast is not authorized" });
+      assert.equal(store.get("cronos", ref).state, "approved");
+    }
+    assert.equal(submissions, 0);
+    store.close();
+  });
+}
