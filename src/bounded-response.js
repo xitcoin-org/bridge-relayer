@@ -32,7 +32,11 @@ export async function readBoundedText(response, { maxBytes, signal }) {
     }
     const chunks = [];
     let length = 0;
+    let reads = 0;
     while (true) {
+      // Immediately resolved empty reads can starve timers without consuming
+      // the byte budget. Bound reads as well as bytes, including the final done.
+      if (++reads > Math.min(maxBytes, 65_535) + 1) throw signerTransportError("SIZE");
       const { done, value } = await withDeadline(() => reader.read(), signal);
       if (done) { complete = true; break; }
       if (!(value instanceof Uint8Array)) throw signerTransportError("STREAM");
