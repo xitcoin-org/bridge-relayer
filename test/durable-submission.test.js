@@ -150,3 +150,25 @@ test("custody filesystem rejects symlinks and permissive paths and preserves pri
   try { db.reserve(candidate.signed); for (const suffix of ["", "-wal", "-shm"]) assert.equal(statSync(`${dir}/signed.sqlite${suffix}`).mode & 0o777, 0o600); }
   finally { db.close(); candidate.store.close(); }
 }));
+test("changed code identity cannot reuse a previous immutable custody intent", () => fixture((dir) => {
+  const candidate = storedCandidate(), signedJournal = journal(dir), intentJournal = intent(dir);
+  try {
+    reserveStoredCronosIntent({ ...candidate, signedJournal, intentJournal, manifest });
+    const changed = `0x${"fa".repeat(32)}`;
+    const evidence = { ...candidate.evidence, identity: { ...candidate.evidence.identity, codeHash: changed },
+      state: { ...candidate.evidence.state, codeHash: changed } };
+    assert.throws(() => reserveStoredCronosIntent({ ...candidate, evidence, signedJournal, intentJournal, manifest }), integrationFailure);
+    assert.equal(signedJournal.inspect(candidate.sourceRef).codeHash, candidate.evidence.identity.codeHash);
+  } finally { signedJournal.close(); intentJournal.close(); candidate.store.close(); }
+}));
+test("duplicate transaction hashes and digests cannot occupy another transfer row", () => fixture((dir) => {
+  const candidate = storedCandidate(), db = journal(dir); db.reserve(candidate.signed);
+  try {
+    assert.throws(() => raw(dir, "INSERT INTO signed_intents SELECT '0x' || replace(hex(zeroblob(32)), '0', 'f'), approval_digest, transaction_digest, transaction_hash, account, '1', vault, code_hash, route_id, signed_hex, state FROM signed_intents"), /UNIQUE/);
+    assert.equal(db.inspect(candidate.sourceRef).signedHex, candidate.signedHex);
+  } finally { db.close(); candidate.store.close(); }
+}));
+test("invalid integration input errors remain sanitized", () => {
+  assert.throws(() => reserveStoredCronosIntent({ get store() { throw new Error("secret"); } }), integrationFailure);
+  assert.throws(() => reserveStoredCronosIntent(null), integrationFailure);
+});

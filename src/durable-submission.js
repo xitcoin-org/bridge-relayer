@@ -11,9 +11,11 @@ import { validateSubmitterManifest } from "./submitter-manifest.js";
 // Offline integration only. Reserve custody first, digest journal second. A crash
 // between commits can leave extra blocking custody, never broadcast permission.
 // RelayStore is held under BEGIN IMMEDIATE while its immutable request is checked.
-export function reserveStoredCronosIntent({ store, signedJournal, intentJournal, manifest, sourceRef, evidence, signedHex }) {
-  let locked = false;
+export function reserveStoredCronosIntent(input) {
+  let locked = false, store;
   try {
+    let signedJournal, intentJournal, manifest, sourceRef, evidence, signedHex;
+    ({ store, signedJournal, intentJournal, manifest, sourceRef, evidence, signedHex } = input);
     if (!(store instanceof RelayStore) || !(signedJournal instanceof SignedIntentJournal)
         || !(intentJournal instanceof BroadcastIntentJournal)) throw new Error();
     const config = validateSubmitterManifest(destinationSnapshot(manifest));

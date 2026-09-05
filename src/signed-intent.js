@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { cronosRouteId } from "./protocol.js";
 import { Transaction, keccak256 } from "ethers";
 import { requireCronosCustody } from "./cronos-destination.js";
 import { DatabaseSync } from "node:sqlite";
@@ -19,6 +20,7 @@ CREATE TABLE signed_intents (
   transfer_id TEXT PRIMARY KEY NOT NULL, approval_digest TEXT NOT NULL,
   transaction_digest TEXT NOT NULL UNIQUE, transaction_hash TEXT NOT NULL UNIQUE,
   account TEXT NOT NULL, nonce TEXT NOT NULL,
+  vault TEXT NOT NULL, code_hash TEXT NOT NULL, route_id TEXT NOT NULL,
   signed_hex TEXT NOT NULL CHECK(length(signed_hex) BETWEEN 4 AND 32768),
   state TEXT NOT NULL CHECK(state IN ('reserved', 'uncertain')),
   UNIQUE(account, nonce)
@@ -88,15 +90,15 @@ export class SignedIntentJournal {
   reserve(input) {
     try {
       const value = requireCronosCustody(input);
-      const { transferId, approvalDigest, transactionDigest, transactionHash, account, nonce, signedHex } = value;
+      const { transferId, approvalDigest, transactionDigest, transactionHash, account, nonce, signedHex, vault, codeHash, routeId } = value;
       this.#path.verify();
       this.#database.exec("BEGIN IMMEDIATE");
       const existing = this.#database.prepare("SELECT * FROM signed_intents WHERE transfer_id = ?").get(transferId);
       const expected = { transfer_id: transferId, approval_digest: approvalDigest, transaction_digest: transactionDigest,
-        transaction_hash: transactionHash, account, nonce, signed_hex: signedHex };
+        transaction_hash: transactionHash, account, nonce, vault, code_hash: codeHash, route_id: routeId, signed_hex: signedHex };
       if (existing && Object.entries(expected).some(([key, item]) => existing[key] !== item)) throw failure();
-      if (!existing) this.#database.prepare("INSERT INTO signed_intents VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved')")
-        .run(transferId, approvalDigest, transactionDigest, transactionHash, account, nonce, signedHex);
+      if (!existing) this.#database.prepare("INSERT INTO signed_intents VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved')")
+        .run(transferId, approvalDigest, transactionDigest, transactionHash, account, nonce, vault, codeHash, routeId, signedHex);
       this.#database.exec("COMMIT");
       return Object.freeze({ created: !existing, state: existing?.state ?? "reserved", mayBroadcast: false });
     } catch {
@@ -114,12 +116,14 @@ export class SignedIntentJournal {
       const tx = Transaction.from(row.signed_hex);
       if (!digest(row.transfer_id) || !digest(row.approval_digest) || !["reserved", "uncertain"].includes(row.state)
           || !tx.isSigned() || tx.type !== 0 || tx.chainId !== 338n || tx.serialized !== row.signed_hex
-          || tx.from !== row.account || String(tx.nonce) !== row.nonce
+          || tx.from !== row.account || String(tx.nonce) !== row.nonce || tx.to !== row.vault
+          || !digest(row.code_hash) || row.route_id !== cronosRouteId("cronos-testnet-xitcoin-testnet")
           || keccak256(row.signed_hex) !== row.transaction_hash
           || `0x${createHash("sha256").update(Buffer.from(row.signed_hex.slice(2), "hex")).digest("hex")}` !== row.transaction_digest) throw failure();
       return Object.freeze({ found: true, state: row.state, transferId: row.transfer_id,
         approvalDigest: row.approval_digest, transactionDigest: row.transaction_digest,
         transactionHash: row.transaction_hash, account: row.account, nonce: row.nonce,
+        vault: row.vault, codeHash: row.code_hash, routeId: row.route_id,
         signedHex: row.signed_hex, mayBroadcast: false });
     } catch { throw failure(); }
   }

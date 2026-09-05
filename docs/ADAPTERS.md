@@ -184,7 +184,7 @@ entrypoint remains outside operational startup.
 `SignedIntentJournal` is a separate, exact-schema SQLite custody database. It
 reuses the existing private-path checks, immediate transactions, FULL sync and
 WAL policy. It accepts only process-local custody produced by the reviewed
-Cronos inspector, stores exact signed bytes, and uniquely reserves both the
+Cronos inspector, stores exact signed bytes and immutable vault/code-hash/route identity, and uniquely reserves both the
 transaction hash/digest and `(account, nonce)`. Identical reservations are
 idempotent; replacements and nonce reuse are forbidden even after uncertainty.
 There is no release, delete, expiry, reset, migration, broadcast or completion
@@ -214,7 +214,7 @@ Remaining integration blockers include independent authorization of supplied
 signer/code/state evidence, an exclusive operational account (including other
 programs and all ledger paths), chain nonce lookup, Xitcoin sequence/custody,
 authenticated destination status reconciliation after expiry, exact finality
-proof, RelayStore lifecycle race/terminal-transition review, and a reviewed
+proof, review and integration of the independent RelayStore race fixes in PR #44, and a reviewed
 release migration preserving pending state. The existing staging submission
 helper remains an offline mock-oriented path, not a production coordinator.
 No operational startup imports the new modules. Every reservation, custody and
