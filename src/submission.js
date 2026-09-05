@@ -1,3 +1,4 @@
+import { types } from "node:util";
 import { Interface, getAddress, isHexString } from "ethers";
 
 import { buildApprovalRequest } from "./approvals.js";
@@ -63,12 +64,24 @@ export async function submitApprovedTransfer({ store, sourceChain, sourceRef, re
   if (!["approved", "submitted"].includes(transfer.state)) throw new Error("transfer is not ready for destination submission");
 
   if (transfer.state === "approved") {
-    const known = await adapter.status({ request });
+    let known;
+    try { known = await adapter.status({ request }); }
+    catch { throw new DestinationViolation("destination broadcast is not authorized"); }
     let destinationRef;
-    if (known?.processed) {
+    if (!known || typeof known !== "object" || types.isProxy(known)
+        || Object.getPrototypeOf(known) !== Object.prototype
+        || typeof Object.getOwnPropertyDescriptor(known, "processed")?.value !== "boolean") {
+      throw new DestinationViolation("destination broadcast is not authorized");
+    }
+    if (Object.getOwnPropertyDescriptor(known, "processed").value) {
       if (!known.canonical) throw new DestinationViolation("processed destination record is not canonical");
       destinationRef = transactionReference(known.destinationRef);
     } else {
+      // Authorization belongs to the trusted adapter status contract. Missing,
+      // inherited, accessor-backed or non-boolean permission always fails closed.
+      if (Object.getOwnPropertyDescriptor(known, "mayBroadcast")?.value !== true) {
+        throw new DestinationViolation("destination broadcast is not authorized");
+      }
       destinationRef = transactionReference(await adapter.submit({
         request, approvals: store.approvals(sourceChain, sourceRef),
       }));

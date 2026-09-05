@@ -47,7 +47,7 @@ test("runs a deterministic end-to-end rehearsal with one signer offline", async 
       assert.equal(result.approvals.length, 2);
     } },
     { name: "destination_finality", async run() {
-      const adapter = { async status() { return { processed: false }; }, async submit() { broadcasts += 1; return TX_HASH; }, async confirm() { return { finalized: true, canonical: true }; } };
+      const adapter = { async status() { return { processed: false, mayBroadcast: true }; }, async submit() { broadcasts += 1; return TX_HASH; }, async confirm() { return { finalized: true, canonical: true }; } };
       assert.equal((await submitApprovedTransfer({ store, sourceChain: "cronos", sourceRef: SOURCE_REF, request: REQUEST, adapter })).transfer.state, "completed");
       assert.equal((await submitApprovedTransfer({ store, sourceChain: "cronos", sourceRef: SOURCE_REF, request: REQUEST, adapter })).idempotent, true);
     } },
