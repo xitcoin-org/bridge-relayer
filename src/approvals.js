@@ -1,7 +1,6 @@
 import { signerTransportError, sanitizeSignerTransportError } from "./signer-transport-error.js";
 import { readBoundedText, withDeadline } from "./bounded-response.js";
 import {
-  Signature,
   getAddress,
   isHexString,
   recoverAddress,
@@ -71,14 +70,23 @@ export function verifyApproval({ request, response, authorizedSigners, nowUnix =
     throw new Error("approval digest mismatch");
   }
   if (!isHexString(response.signature, 65)) throw new Error("approval signature must contain 65 bytes");
-  const signature = Signature.from(response.signature);
+  // pos-chain 5ec8692e8fc1813d0892ee535af1a73953a1c4fb:
+  // x/bridge/types/signatures.go recoverSigner + ValidateSignatureValues(..., true).
+  // Inspect original r || s || v before ethers can normalize v (including EIP-155).
+  const signature = response.signature;
+  const recovery = Number.parseInt(signature.slice(130, 132), 16);
+  if (![0, 1, 27, 28].includes(recovery)) throw new Error("invalid signature recovery ID");
+  const order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+  const r = BigInt(`0x${signature.slice(2, 66)}`);
+  const s = BigInt(`0x${signature.slice(66, 130)}`);
+  if (r < 1n || r >= order || s < 1n || s > order / 2n) throw new Error("invalid signature values");
   const recovered = getAddress(recoverAddress(expected.digest, signature));
   const allowed = signerSet(authorizedSigners);
   if (!allowed.some((signer) => signer === recovered)) throw new Error("approval is not from an authorized signer");
   if (response.signer && getAddress(response.signer) !== recovered) {
     throw new Error("approval signer does not match the signature");
   }
-  return Object.freeze({ signer: recovered, digest: expected.digest, signature: signature.serialized });
+  return Object.freeze({ signer: recovered, digest: expected.digest, signature });
 }
 
 export async function collectApprovalQuorum({

@@ -45,6 +45,9 @@ export function prepareCronosRelease(input) {
     hash(p.sourceBurnId); account(p.recipient);
     decimal(p.amount, 256); decimalOrSafeInteger(p.signerSetVersion, 64); decimalOrSafeInteger(p.deadline, 256);
     const quorum = verifiedDestinationQuorum(request, value.approvals, value.authorizedSigners, value.nowUnix);
+    // The reviewed vault uses OpenZeppelin ECDSA.recover(bytes): unlike the
+    // Xitcoin verifier, its original recovery byte must be 27 or 28.
+    if (quorum.some(({ signature }) => ![27, 28].includes(Number.parseInt(signature.slice(130, 132), 16)))) throw error();
     const nonce = decimal(tx.nonce, 64, false);
     if (nonce > BigInt(Number.MAX_SAFE_INTEGER)) throw error(); // ethers nonce representation
     const gas = decimal(tx.gasLimit, 256), price = decimal(tx.gasPrice, 256);

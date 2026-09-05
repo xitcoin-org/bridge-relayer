@@ -5,7 +5,7 @@ import { evmAddressToBech32 } from "../../src/address.js";
 import { DIRECTION_INBOUND } from "../../src/protocol.js";
 export const keys = [1, 2, 3, 4].map((n) => new SigningKey(`0x${n.toString(16).padStart(64, "0")}`));
 export const signers = keys.slice(0, 3).map((k) => computeAddress(k.publicKey));
-export function sign(request, indexes = [0, 1]) {
+export function sign(request, indexes = [1, 0]) {
   return indexes.map((i) => ({ signer: computeAddress(keys[i].publicKey), digest: request.digest,
     signature: keys[i].sign(request.digest).serialized }));
 }

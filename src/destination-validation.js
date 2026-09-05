@@ -57,7 +57,12 @@ export function verifiedDestinationQuorum(request, approvals, authorizedSigners,
   const verified = approvals.map((response) => {
     exactFields(response, ["signer", "digest", "signature"]);
     return verifyApproval({ request, response, authorizedSigners, nowUnix });
-  }).sort((a, b) => a.signer.toLowerCase().localeCompare(b.signer.toLowerCase()));
+  });
+  // Approval protocol v1 orders authorized recovered addresses numerically,
+  // independent of the supplied set's enumeration. Never repair caller order.
+  for (let i = 1; i < verified.length; i++) {
+    if (BigInt(verified[i - 1].signer) >= BigInt(verified[i].signer)) throw new Error();
+  }
   if (new Set(verified.map((a) => a.signer)).size !== verified.length) throw new Error();
   return Object.freeze(verified);
 }
