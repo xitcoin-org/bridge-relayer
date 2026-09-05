@@ -172,3 +172,15 @@ test("invalid integration input errors remain sanitized", () => {
   assert.throws(() => reserveStoredCronosIntent({ get store() { throw new Error("secret"); } }), integrationFailure);
   assert.throws(() => reserveStoredCronosIntent(null), integrationFailure);
 });
+
+test("restart rejects transfer and approval metadata disconnected from signed calldata", () => fixture((dir) => {
+  for (const column of ["transfer_id", "approval_digest"]) {
+    const candidate = storedCandidate(), db = journal(dir);
+    db.reserve(candidate.signed); db.close();
+    const changed = `0x${"fa".repeat(32)}`;
+    raw(dir, `UPDATE signed_intents SET ${column}='${changed}'`);
+    const reopened = journal(dir);
+    try { assert.throws(() => reopened.inspect(column === "transfer_id" ? changed : candidate.sourceRef), failure); }
+    finally { reopened.close(); candidate.store.close(); rmSync(`${dir}/signed.sqlite`); }
+  }
+}));

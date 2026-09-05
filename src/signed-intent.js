@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { cronosRouteId } from "./protocol.js";
-import { Transaction, keccak256 } from "ethers";
+import { cronosRouteId, releaseDigest } from "./protocol.js";
+import { Interface, Transaction, keccak256 } from "ethers";
 import { requireCronosCustody } from "./cronos-destination.js";
 import { DatabaseSync } from "node:sqlite";
 import { lstatSync } from "node:fs";
@@ -8,6 +8,7 @@ import { userInfo } from "node:os";
 import { PrivateJournalPath } from "./journal-path.js";
 import { validateSubmitterManifest } from "./submitter-manifest.js";
 
+const vaultABI = new Interface(["function release(bytes32,address,uint256,uint64,uint256,bytes[])"]);
 const digest = (value) => typeof value === "string" && /^0x[0-9a-f]{64}$/.test(value);
 const failure = () => new Error("signed intent unavailable or conflicting");
 
@@ -113,7 +114,16 @@ export class SignedIntentJournal {
       this.#path.verify();
       const row = this.#database.prepare("SELECT * FROM signed_intents WHERE transfer_id = ?").get(transferId);
       if (!row) return Object.freeze({ found: false, mayBroadcast: false });
+      if (typeof row.signed_hex !== "string" || row.signed_hex.length > 32768
+          || !/^0x(?:[0-9a-f]{2})+$/.test(row.signed_hex)) throw failure();
       const tx = Transaction.from(row.signed_hex);
+      const args = vaultABI.decodeFunctionData("release", tx.data);
+      if (tx.value !== 0n || vaultABI.encodeFunctionData("release", args) !== tx.data
+          || args[0] !== row.transfer_id || args[2] === 0n || args[3] === 0n || args[4] === 0n
+          || args[5].length < 2 || args[5].length > 3
+          || args[5].some((signature) => !/^0x[0-9a-f]{128}(1b|1c)$/.test(signature))
+          || releaseDigest({ chainId: 338, vault: row.vault, sourceBurnId: args[0], recipient: args[1],
+            amount: args[2], signerSetVersion: args[3], deadline: args[4] }) !== row.approval_digest) throw failure();
       if (!digest(row.transfer_id) || !digest(row.approval_digest) || !["reserved", "uncertain"].includes(row.state)
           || !tx.isSigned() || tx.type !== 0 || tx.chainId !== 338n || tx.serialized !== row.signed_hex
           || tx.from !== row.account || String(tx.nonce) !== row.nonce || tx.to !== row.vault
