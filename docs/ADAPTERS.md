@@ -118,8 +118,19 @@ adapters. It supplies no broadcast permission and leaves startup disabled.
 marshal tags at the same pos-chain commit. It binds the local plan to
 `xitcoin-testnet-v2-1`, source chain `338`, and the disabled manifest route.
 It verifies every signature against an explicitly supplied three-member set,
-rejects duplicate/unauthorized approvals and altered request digests, and orders
-signatures deterministically. That supplied set still requires authenticated
+rejects duplicate/unauthorized approvals and altered request digests, and requires
+strictly increasing recovered EVM addresses (numeric 20-byte address order), as
+already emitted by approval protocol v1. The authorized set's enumeration does
+not change this order. Reversed or other noncanonical permutations are rejected,
+never sorted. The chain itself accepts unordered approvals; this input-order
+requirement is the relayer approval protocol's stricter policy.
+
+Raw signatures must be exactly 65 bytes, with fixed-width big-endian scalars
+`1 <= r < n`, `1 <= s <= n/2`, and recovery byte `0`, `1`, `27` or `28`, matching
+[pinned recoverSigner](https://github.com/xitcoin-org/pos-chain/blob/5ec8692e8fc1813d0892ee535af1a73953a1c4fb/x/bridge/types/signatures.go)
+and its `ValidateSignatureValues(..., true)` call. Original bytes are checked
+before ethers recovery and preserved in the message; unsupported recovery IDs
+(including `0x24` and `0x26`) and high-s signatures are rejected. That supplied set still requires authenticated
 canonical chain-state evidence before runtime use. Input snapshots reject object
 traps, excessive depth/size, coercion and unsafe integers. Output strings and
 metadata are frozen; `messageDigest` is SHA-256 of the message only, **not a

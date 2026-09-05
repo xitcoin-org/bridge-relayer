@@ -10,8 +10,9 @@ test("exact pinned message vector; immutable output, deterministic signature ord
   const result = prepareXitcoinAttestation(input);
   assert.equal(result.messageHex, JSON.parse(readFileSync(new URL("./fixtures/xitcoin-message.json", import.meta.url))).messageHex);
   assert.equal(result.mayBroadcast, false);
-  input.approvals.reverse();
   assert.deepEqual(prepareXitcoinAttestation(input), result);
+  input.approvals.reverse();
+  rejected(input);
   assert(Object.isFrozen(result));
   assert.match(result.messageHex, /30ffffffffffffffffff01/); // uint64 max, no Number conversion
 });
