@@ -18,6 +18,23 @@ test("deadline bounds delayed headers, stalled body, endless stream and untruste
   }
 });
 test("rejects unsafe response budget configuration", async () => {
-  for (const bounds of [{ timeoutMs: 0 }, { timeoutMs: Infinity }, { maxBytes: 32769 }, { maxBytes: "10" }])
+  for (const bounds of [{ timeoutMs: 0 }, { timeoutMs: Infinity }, { maxBytes: 32769 }, { maxBytes: "10" }, { maxBytes: null }, { timeoutMs: null }])
     await assert.rejects(readDestinationResponse(() => {}, bounds), failure);
+});
+
+test("endless empty chunks cannot starve the deadline or bypass byte budgets", async () => {
+  let reads = 0;
+  const response = { ok: true, body: { getReader() { return {
+    read() { reads++; return Promise.resolve({ done: false, value: new Uint8Array(0) }); },
+    cancel() {}, releaseLock() {},
+  }; } } };
+  await assert.rejects(readDestinationResponse(() => response, { timeoutMs: 25, maxBytes: 32 }), failure);
+  assert(reads <= 33);
+});
+test("malicious option accessors and proxies never execute or leak", async () => {
+  let calls = 0;
+  for (const limits of [{ get timeoutMs() { calls++; throw new Error("secret"); } },
+    new Proxy({}, { ownKeys() { calls++; throw new Error("secret"); } }), { unknown: 1 }])
+    await assert.rejects(readDestinationResponse(() => {}, limits), failure);
+  assert.equal(calls, 0);
 });

@@ -219,3 +219,12 @@ release migration preserving pending state. The existing staging submission
 helper remains an offline mock-oriented path, not a production coordinator.
 No operational startup imports the new modules. Every reservation, custody and
 inclusion result keeps `mayBroadcast: false`.
+The optional `test/reference/verify-xitcoin-protobuf.py` independently constructs
+a descriptor from the pinned proto with Python protobuf 6.33.5, decodes the
+synthetic fixture and deterministically re-encodes identical bytes. This check
+was executed in an isolated temporary environment; protobuf is not a runtime
+relayer dependency. It does not replace a chain-generated signing vector.
+
+The shared streamed reader also caps read operations: endless immediately resolved
+empty chunks cannot starve the timer without exhausting a byte budget. This
+fail-closed cap applies to signer responses as well as destination fixtures.

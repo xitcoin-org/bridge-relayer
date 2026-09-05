@@ -74,6 +74,7 @@ export function inspectCronosSignedTransaction(plan, signedHex) {
         || tx.gasPrice !== BigInt(plan.gasPrice)) throw error();
     const result = Object.freeze({ destination: "cronos", chainId: 338,
       transferId: plan.sourceBurnId, approvalDigest: plan.approvalDigest,
+      vault: plan.to, codeHash: plan.codeHash, routeId: plan.routeId,
       account: plan.submitter, nonce: plan.nonce, signedHex,
       transactionDigest: `0x${createHash("sha256").update(Buffer.from(signedHex.slice(2), "hex")).digest("hex")}`,
       transactionHash: keccak256(signedHex), mayBroadcast: false });
