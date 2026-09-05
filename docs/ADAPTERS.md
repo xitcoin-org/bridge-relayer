@@ -109,3 +109,56 @@ to release their own resources even though the caller settles on deadline.
 This hardening does not cover the existing ethers-based CometBFT or Cronos
 transports, which still need bounded streaming review before use by destination
 adapters. It supplies no broadcast permission and leaves startup disabled.
+
+## Offline Xitcoin message construction (operational-v1)
+
+`prepareXitcoinAttestation` builds only
+`/cosmos.evm.bridge.v1.MsgSubmitAttestation`, using the verbatim pinned
+[transaction schema](evidence/xitcoin-tx.proto) and the generated `tx.pb.go`
+marshal tags at the same pos-chain commit. It binds the local plan to
+`xitcoin-testnet-v2-1`, source chain `338`, and the disabled manifest route.
+It verifies every signature against an explicitly supplied three-member set,
+rejects duplicate/unauthorized approvals and altered request digests, and requires
+strictly increasing recovered EVM addresses (numeric 20-byte address order), as
+already emitted by approval protocol v1. The authorized set's enumeration does
+not change this order. Reversed or other noncanonical permutations are rejected,
+never sorted. The chain itself accepts unordered approvals; this input-order
+requirement is the relayer approval protocol's stricter policy.
+
+Raw signatures must be exactly 65 bytes, with fixed-width big-endian scalars
+`1 <= r < n`, `1 <= s <= n/2`, and recovery byte `0`, `1`, `27` or `28`, matching
+[pinned recoverSigner](https://github.com/xitcoin-org/pos-chain/blob/5ec8692e8fc1813d0892ee535af1a73953a1c4fb/x/bridge/types/signatures.go)
+and its `ValidateSignatureValues(..., true)` call. Original bytes are checked
+before ethers recovery and preserved in the message; unsupported recovery IDs
+(including `0x24` and `0x26`) and high-s signatures are rejected. That supplied set still requires authenticated
+canonical chain-state evidence before runtime use. Input snapshots reject object
+traps, excessive depth/size, coercion and unsafe integers. Output strings and
+metadata are frozen; `messageDigest` is SHA-256 of the message only, **not a
+transaction hash**. Chain ID is plan metadata; this message schema has no
+chain-ID field for the destination. Transaction-level binding is still missing.
+
+Local stricter policy requires canonical decimal strings, positive uint64 nonce,
+positive uint256 amount, safe-integer positive int64 deadline (decimal string or safe numeric Unix seconds), canonical 20-byte
+`xtc` addresses and 2–3 signatures. This intentionally rejects some representations
+the chain may normalize. The fixture uses synthetic public keys, not chain
+transactions; its byte layout is checked against the pinned generated Go encoder.
+A chain-generated differential signing vector remains required.
+
+Additional inspected evidence: pos-chain `encoding/config.go` selects SDK
+`tx.DefaultSignModes`, and `go.mod` pins Cosmos SDK v0.54.4 and CometBFT v0.39.4.
+Those dependency declarations alone do not validate this relayer's TxRaw,
+AuthInfo, SignDoc, public-key Any, signer account type, account query responses,
+fees, execution response handling or finality verifier. None is fabricated here.
+Testnets commit `1633957e805f6782b201a623335c9eebafa0cece`,
+`xitcoin-testnet-v2-1/chain.json`, identifies `axtc` and a disabled, unconfigured
+bridge route; no live endpoint was queried. `mayBroadcast` remains false.
+
+Coordinator source evidence is structurally validated when supplied, but remains
+external to the attestation wire message and its digest. Independent source
+finality validation is still mandatory before any runtime submission.
+
+The optional `test/reference/verify-xitcoin-protobuf.py` independently constructs
+a descriptor from the pinned proto with Python protobuf 6.33.5, decodes the
+synthetic fixture and deterministically re-encodes identical bytes. This check
+was executed in an isolated temporary environment; protobuf is not a runtime
+relayer dependency. It does not replace a chain-generated signing vector.

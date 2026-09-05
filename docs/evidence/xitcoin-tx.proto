@@ -1,0 +1,138 @@
+syntax = "proto3";
+package cosmos.evm.bridge.v1;
+
+import "amino/amino.proto";
+import "cosmos/msg/v1/msg.proto";
+import "cosmos_proto/cosmos.proto";
+
+option go_package = "github.com/xitcoin-org/pos-chain/x/bridge/types";
+
+// Msg defines bridge settlement actions.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  // SubmitAttestation validates and settles an inbound Cronos attestation.
+  rpc SubmitAttestation(MsgSubmitAttestation) returns (MsgSubmitAttestationResponse);
+
+  // InitiateOutboundTransfer burns native XTC owned by the signer.
+  rpc InitiateOutboundTransfer(MsgInitiateOutboundTransfer) returns (MsgInitiateOutboundTransferResponse);
+
+  // InitializeRouteConfig creates the first route in a disabled and paused state.
+  rpc InitializeRouteConfig(MsgInitializeRouteConfig) returns (MsgInitializeRouteConfigResponse);
+
+  // EmergencyPauseRoute allows the configured guardian to pause the route.
+  rpc EmergencyPauseRoute(MsgEmergencyPauseRoute) returns (MsgEmergencyPauseRouteResponse);
+
+  // ResumeRoute requires threshold approval from the current bridge signers.
+  rpc ResumeRoute(MsgResumeRoute) returns (MsgResumeRouteResponse);
+
+  // UpdateRouteConfig requires threshold approval from the current bridge signers.
+  rpc UpdateRouteConfig(MsgUpdateRouteConfig) returns (MsgUpdateRouteConfigResponse);
+}
+
+// MsgSubmitAttestation submits a fully signed inbound attestation.
+message MsgSubmitAttestation {
+  option (cosmos.msg.v1.signer) = "submitter";
+  option (amino.name) = "xitcoin/bridge/MsgSubmitAttestation";
+
+  string submitter = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
+  string route_id = 2;
+  string direction = 3;
+  string source_chain_id = 4;
+  string source_ref = 5;
+  uint64 nonce = 6;
+  string destination = 7;
+  string amount = 8;
+  int64 deadline_unix = 9;
+  repeated bytes signatures = 10;
+}
+
+// MsgSubmitAttestationResponse returns the deterministic replay-protection ID.
+message MsgSubmitAttestationResponse {
+  string attestation_id = 1;
+}
+
+message MsgInitiateOutboundTransfer {
+  option (cosmos.msg.v1.signer) = "sender";
+  option (amino.name) = "xitcoin/bridge/MsgInitiateOutboundTransfer";
+
+  string sender = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
+  string route_id = 2;
+  string destination = 3;
+  string amount = 4;
+}
+
+message MsgInitiateOutboundTransferResponse {
+  string request_id = 1;
+  uint64 nonce = 2;
+}
+
+// MsgInitializeRouteConfig creates the first bridge route. The configured
+// authority is the only valid signer and the route cannot be enabled here.
+message MsgInitializeRouteConfig {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name) = "xitcoin/bridge/MsgInitializeRouteConfig";
+
+  string authority = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
+  string route_id = 2;
+  repeated string bridge_signers = 3;
+  string guardian = 4;
+  string max_transfer_amount = 5;
+  string daily_limit = 6;
+  string max_outstanding_amount = 7;
+}
+
+message MsgInitializeRouteConfigResponse {}
+
+// MsgEmergencyPauseRoute submits a guardian-signed pause action. The submitter
+// only pays transaction fees and receives no bridge authority.
+message MsgEmergencyPauseRoute {
+  option (cosmos.msg.v1.signer) = "submitter";
+  option (amino.name) = "xitcoin/bridge/MsgEmergencyPauseRoute";
+
+  string submitter = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
+  string route_id = 2;
+  uint64 nonce = 3;
+  int64 expires_unix = 4;
+  bytes guardian_signature = 5;
+}
+
+message MsgEmergencyPauseRouteResponse {}
+
+// MsgResumeRoute submits a time-bounded 2-of-3 approval to clear only the
+// route's paused state. It cannot modify the route configuration.
+message MsgResumeRoute {
+  option (cosmos.msg.v1.signer) = "submitter";
+  option (amino.name) = "xitcoin/bridge/MsgResumeRoute";
+
+  string submitter = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
+  string route_id = 2;
+  uint64 nonce = 3;
+  int64 not_before_unix = 4;
+  int64 expires_unix = 5;
+  repeated bytes signatures = 6;
+}
+
+message MsgResumeRouteResponse {}
+
+// MsgUpdateRouteConfig submits a time-bounded 2-of-3 approval over the exact
+// next configuration. The current signer set always authorizes rotations.
+message MsgUpdateRouteConfig {
+  option (cosmos.msg.v1.signer) = "submitter";
+  option (amino.name) = "xitcoin/bridge/MsgUpdateRouteConfig";
+
+  string submitter = 1 [ (cosmos_proto.scalar) = "cosmos.AddressString" ];
+  string route_id = 2;
+  repeated string bridge_signers = 3;
+  string guardian = 4;
+  string max_transfer_amount = 5;
+  string daily_limit = 6;
+  string max_outstanding_amount = 7;
+  bool enabled = 8;
+  uint64 nonce = 9;
+  int64 not_before_unix = 10;
+  int64 expires_unix = 11;
+  repeated bytes signatures = 12;
+}
+
+message MsgUpdateRouteConfigResponse {}
