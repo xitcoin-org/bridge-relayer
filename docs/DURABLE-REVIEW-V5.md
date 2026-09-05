@@ -41,3 +41,5 @@ receipt/block evidence, coordinated upgrades, and operational reconciliation
 remain explicit blockers. Existing offline reservations cannot prove a send
 occurred, failed, or finalized. Independent source and destination evidence is
 required before any future completion implementation.
+
+Recovery checks validate self-consistency only; no database row authenticates live chain state.
