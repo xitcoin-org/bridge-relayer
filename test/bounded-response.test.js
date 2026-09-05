@@ -49,5 +49,5 @@ test("signer deadline covers credentials, headers and stalled response body", as
   assert.equal(cancelled, true);
 });
 test("signer rejects HTTP failure without parsing response content", async () => {
-  await assert.rejects(client(async () => new Response("{}", { status: 503 })).approve({}), /HTTP 503/);
+  await assert.rejects(client(async () => new Response("{}", { status: 503 })).approve({}), /HTTP failure/);
 });

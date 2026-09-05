@@ -1,12 +1,13 @@
 import { Buffer } from "node:buffer";
+import { signerTransportError } from "./signer-transport-error.js";
 
 // A deadline must settle the caller even when an injected dependency ignores
 // AbortSignal. Such dependencies remain trusted to release their own resources.
 export async function withDeadline(operation, signal) {
-  if (signal.aborted) throw new Error("signer request timed out");
+  if (signal.aborted) throw signerTransportError("TIMEOUT");
   let abort;
   const expired = new Promise((_, reject) => {
-    abort = () => reject(new Error("signer request timed out"));
+    abort = () => reject(signerTransportError("TIMEOUT"));
     signal.addEventListener("abort", abort, { once: true });
   });
   try {
@@ -19,7 +20,7 @@ export async function withDeadline(operation, signal) {
 export async function readBoundedText(response, { maxBytes, signal }) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error("invalid response size limit");
   if (!response.body || typeof response.body.getReader !== "function") {
-    throw new Error("signer response requires a readable byte stream");
+    throw signerTransportError("STREAM");
   }
   const reader = response.body.getReader();
   let complete = false;
@@ -27,25 +28,29 @@ export async function readBoundedText(response, { maxBytes, signal }) {
     const declared = response.headers?.get?.("content-length");
     if (declared !== null && declared !== undefined
         && (!/^(0|[1-9][0-9]*)$/.test(declared) || BigInt(declared) > BigInt(maxBytes))) {
-      throw new Error("signer response exceeds size limit or has invalid content length");
+      throw signerTransportError("LENGTH");
     }
     const chunks = [];
     let length = 0;
     while (true) {
       const { done, value } = await withDeadline(() => reader.read(), signal);
       if (done) { complete = true; break; }
-      if (!(value instanceof Uint8Array)) throw new Error("signer response is not a byte stream");
-      if (value.byteLength > maxBytes - length) throw new Error("signer response exceeds size limit");
+      if (!(value instanceof Uint8Array)) throw signerTransportError("STREAM");
+      if (value.byteLength > maxBytes - length) throw signerTransportError("SIZE");
       length += value.byteLength;
       if (value.byteLength) chunks.push(Buffer.from(value));
     }
     // Count decoded transport bytes, not characters or compressed wire length.
-    return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, length));
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, length));
+    } catch {
+      throw signerTransportError("ENCODING");
+    }
   } finally {
     if (!complete) {
       // Cancellation must not turn a rejected read into an unbounded wait.
       try { Promise.resolve(reader.cancel()).catch(() => {}); } catch {}
     }
-    reader.releaseLock();
+    try { reader.releaseLock(); } catch {}
   }
 }

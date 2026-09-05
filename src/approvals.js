@@ -1,3 +1,4 @@
+import { signerTransportError, sanitizeSignerTransportError } from "./signer-transport-error.js";
 import { readBoundedText, withDeadline } from "./bounded-response.js";
 import {
   Signature,
@@ -150,29 +151,38 @@ export class RemoteSignerClient {
   async approve(request) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    let body;
+    let response;
+    let reading = false;
     try {
       const authorization = String(await withDeadline(() => this.authorizationHeader(), controller.signal));
       if (!authorization.startsWith("Bearer ") || authorization.length < 39 || /[\r\n]/.test(authorization)) {
-        throw new Error("signer transport authentication is invalid");
+        throw signerTransportError("AUTHENTICATION");
       }
-      const response = await withDeadline(() => this.fetch(this.url, {
+      response = await withDeadline(() => this.fetch(this.url, {
         method: "POST",
         headers: { accept: "application/json", authorization, "content-type": "application/json" },
         body: JSON.stringify(request),
         redirect: "error",
         signal: controller.signal,
       }), controller.signal);
-      if (!response.ok) throw new Error(`signer returned HTTP ${response.status}`);
-      body = await readBoundedText(response, { maxBytes: this.maxResponseBytes, signal: controller.signal });
+      if (!response.ok) throw signerTransportError("HTTP");
+      reading = true;
+      const body = await readBoundedText(response, { maxBytes: this.maxResponseBytes, signal: controller.signal });
+      try {
+        return JSON.parse(body);
+      } catch {
+        throw signerTransportError("JSON");
+      }
+    } catch (error) {
+      throw sanitizeSignerTransportError(error);
     } finally {
+      // HTTP failures have not acquired a reader. Cancel without trusting
+      // injected cleanup to settle or to throw safe errors.
+      if (response && !reading) {
+        try { Promise.resolve(response.body?.cancel()).catch(() => {}); } catch {}
+      }
       controller.abort();
       clearTimeout(timer);
-    }
-    try {
-      return JSON.parse(body);
-    } catch {
-      throw new Error("signer returned invalid JSON");
     }
   }
 }
