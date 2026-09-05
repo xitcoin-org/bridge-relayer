@@ -78,3 +78,12 @@ test("Cronos requires original vault-compatible recovery bytes", () => {
   const input = outbound();
   rejects(() => prepareCronosRelease({ ...input, approvals: [...input.approvals].reverse() }));
 });
+
+test("unrelated events may contain a zero topic without weakening the release match", () => {
+  const plan = prepareCronosRelease(outbound()), signed = inspectCronosSignedTransaction(plan, signedBytes(plan));
+  const evidence = inclusion(plan, signed);
+  evidence.logs.unshift({ address: plan.to, topics: [`0x${"00".repeat(32)}`], data: "0x", removed: false });
+  assert.equal(inspectCronosInclusion(plan, signed, evidence).included, true);
+  evidence.logs[0].topics[0] = "0x00";
+  rejects(() => inspectCronosInclusion(plan, signed, evidence));
+});

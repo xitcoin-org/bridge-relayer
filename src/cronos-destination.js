@@ -113,7 +113,10 @@ export function inspectCronosInclusion(plan, signed, input) {
       account(log.address);
       if (!Array.isArray(log.topics) || log.topics.length > 4 || typeof log.data !== "string"
           || !/^0x(?:[0-9a-f]{2})*$/.test(log.data) || log.removed !== false) throw error();
-      for (const topic of log.topics) hash(topic);
+      // Zero is a valid bytes32 topic in unrelated contract events.
+      for (const topic of log.topics) {
+        if (typeof topic !== "string" || !/^0x[0-9a-f]{64}$/.test(topic)) throw error();
+      }
       if (getAddress(log.address) === plan.to && log.topics[0] === event.topics[0]) {
         if (JSON.stringify(log.topics) !== JSON.stringify(event.topics) || log.data !== event.data) throw error();
         matches++;

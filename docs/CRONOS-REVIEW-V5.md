@@ -35,6 +35,9 @@ Regression cases cover both quorum positions and reversed approval order.
   finality or permits lifecycle completion. Receipt authenticity, actual input
   lookup, block membership and independent finality remain unresolved.
 
-Original head: 190 tests. Corrected integration: 206 tests, vectors, syntax
+Original head: 190 tests. Corrected integration: 207 tests, vectors, syntax
 and dependency audit pass. These are synthetic offline fixtures. Fresh review
 of the corrected head is required before merge; operational startup is disabled.
+
+Receipt topic shape permits zero-valued unrelated topics; the exact Released
+event match still requires the approved burn, recipient, amount and version.
