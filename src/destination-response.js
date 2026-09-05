@@ -9,7 +9,8 @@ export async function readDestinationResponse(readResponse, options = {}) {
     const limits = destinationSnapshot(options);
     if (!limits || Array.isArray(limits) || typeof limits !== "object"
         || Object.keys(limits).some((key) => !["timeoutMs", "maxBytes"].includes(key))) throw new Error();
-    timeoutMs = limits.timeoutMs ?? 5000; maxBytes = limits.maxBytes ?? 32768;
+    timeoutMs = Object.hasOwn(limits, "timeoutMs") ? limits.timeoutMs : 5000;
+    maxBytes = Object.hasOwn(limits, "maxBytes") ? limits.maxBytes : 32768;
     if (typeof readResponse !== "function" || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 10000
       || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 32768) throw new Error();
   } catch { throw new Error("invalid destination response"); }

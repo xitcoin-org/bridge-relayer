@@ -18,7 +18,7 @@ test("deadline bounds delayed headers, stalled body, endless stream and untruste
   }
 });
 test("rejects unsafe response budget configuration", async () => {
-  for (const bounds of [{ timeoutMs: 0 }, { timeoutMs: Infinity }, { maxBytes: 32769 }, { maxBytes: "10" }])
+  for (const bounds of [{ timeoutMs: 0 }, { timeoutMs: Infinity }, { maxBytes: 32769 }, { maxBytes: "10" }, { maxBytes: null }, { timeoutMs: null }])
     await assert.rejects(readDestinationResponse(() => {}, bounds), failure);
 });
 

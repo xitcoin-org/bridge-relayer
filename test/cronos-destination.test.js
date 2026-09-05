@@ -13,6 +13,9 @@ test("exact reviewed release call, signed-byte hash and custody binding, permane
   const bytes = signedBytes(plan), signed = inspectCronosSignedTransaction(plan, bytes);
   assert.equal(signed.transactionHash, keccak256(bytes));
   assert.equal(signed.signedHex, bytes);
+  assert.equal(signed.codeHash, input.identity.codeHash);
+  assert.equal(signed.routeId, input.identity.routeId);
+  assert.equal(signed.vault, input.identity.vault);
   assert.equal(signed.mayBroadcast, false);
   assert(Object.isFrozen(plan)); assert(Object.isFrozen(signed));
   rejects(() => requireCronosCustody({ ...signed }));
