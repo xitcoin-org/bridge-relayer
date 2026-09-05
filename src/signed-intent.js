@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { Transaction, keccak256 } from "ethers";
+import { requireCronosCustody } from "./cronos-destination.js";
 import { DatabaseSync } from "node:sqlite";
 import { lstatSync } from "node:fs";
 import { userInfo } from "node:os";
@@ -5,17 +8,20 @@ import { PrivateJournalPath } from "./journal-path.js";
 import { validateSubmitterManifest } from "./submitter-manifest.js";
 
 const digest = (value) => typeof value === "string" && /^0x[0-9a-f]{64}$/.test(value);
-const failure = () => new Error("broadcast intent unavailable or conflicting");
+const failure = () => new Error("signed intent unavailable or conflicting");
 
 const CHAIN_SCHEMA = Object.freeze({
   xitcoin: "5ec8692e8fc1813d0892ee535af1a73953a1c4fb",
   cronos: "d3ae7058d4c6697a9ec079864e1891b661de5b3e",
 });
 const SCHEMA = `CREATE TABLE intent_binding (id INTEGER PRIMARY KEY CHECK(id = 1), binding TEXT NOT NULL) STRICT;
-CREATE TABLE broadcast_intents (
+CREATE TABLE signed_intents (
   transfer_id TEXT PRIMARY KEY NOT NULL, approval_digest TEXT NOT NULL,
-  transaction_digest TEXT NOT NULL UNIQUE,
-  state TEXT NOT NULL CHECK(state IN ('reserved', 'uncertain'))
+  transaction_digest TEXT NOT NULL UNIQUE, transaction_hash TEXT NOT NULL UNIQUE,
+  account TEXT NOT NULL, nonce TEXT NOT NULL,
+  signed_hex TEXT NOT NULL CHECK(length(signed_hex) BETWEEN 4 AND 32768),
+  state TEXT NOT NULL CHECK(state IN ('reserved', 'uncertain')),
+  UNIQUE(account, nonce)
 ) STRICT;`;
 const SCHEMA_QUERY = "SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name";
 const reference = new DatabaseSync(":memory:");
@@ -25,7 +31,7 @@ reference.close();
 
 // Offline reservation primitive only. A reservation is NEVER permission to send.
 // No expiry, deletion, replacement or retry API: uncertainty permanently blocks reuse.
-export class BroadcastIntentJournal {
+export class SignedIntentJournal {
   #database;
   #binding;
 
@@ -34,10 +40,11 @@ export class BroadcastIntentJournal {
   constructor(path, config, { identity = userInfo, stat = lstatSync } = {}) {
     try {
       const manifest = validateSubmitterManifest(config);
+      if (manifest.destination !== "cronos") throw failure();
       const owner = identity();
       if (owner.username !== `xitcoin-bridge-submitter-${manifest.destination}`
           || !Number.isSafeInteger(owner.uid) || owner.uid <= 0 || owner.uid !== process.geteuid()) throw failure();
-      this.#binding = JSON.stringify({ schemaVersion: 1, manifest, chainSchema: CHAIN_SCHEMA });
+      this.#binding = JSON.stringify({ schemaVersion: 1, kind: "offline_cronos_signed_custody", manifest, chainSchema: CHAIN_SCHEMA });
       this.#path = new PrivateJournalPath(path, owner.uid, stat);
       this.#database = new DatabaseSync(this.#path.path, { timeout: 1000 });
       this.#path.verify();
@@ -74,22 +81,22 @@ export class BroadcastIntentJournal {
   assertManifest(config) {
     try {
       const manifest = validateSubmitterManifest(config);
-      if (this.#binding !== JSON.stringify({ schemaVersion: 1, manifest, chainSchema: CHAIN_SCHEMA })) throw failure();
+      if (this.#binding !== JSON.stringify({ schemaVersion: 1, kind: "offline_cronos_signed_custody", manifest, chainSchema: CHAIN_SCHEMA })) throw failure();
     } catch { throw failure(); }
   }
 
   reserve(input) {
-    if (!input || typeof input !== "object" || Array.isArray(input)
-        || Object.keys(input).length !== 3
-        || Object.keys(input).some((key) => !["transferId", "approvalDigest", "transactionDigest"].includes(key))) throw failure();
-    const { transferId, approvalDigest, transactionDigest } = input;
-    if (![transferId, approvalDigest, transactionDigest].every(digest)) throw failure();
     try {
+      const value = requireCronosCustody(input);
+      const { transferId, approvalDigest, transactionDigest, transactionHash, account, nonce, signedHex } = value;
       this.#path.verify();
       this.#database.exec("BEGIN IMMEDIATE");
-      const existing = this.#database.prepare("SELECT * FROM broadcast_intents WHERE transfer_id = ?").get(transferId);
-      if (existing && (existing.approval_digest !== approvalDigest || existing.transaction_digest !== transactionDigest)) throw failure();
-      if (!existing) this.#database.prepare("INSERT INTO broadcast_intents VALUES (?, ?, ?, 'reserved')").run(transferId, approvalDigest, transactionDigest);
+      const existing = this.#database.prepare("SELECT * FROM signed_intents WHERE transfer_id = ?").get(transferId);
+      const expected = { transfer_id: transferId, approval_digest: approvalDigest, transaction_digest: transactionDigest,
+        transaction_hash: transactionHash, account, nonce, signed_hex: signedHex };
+      if (existing && Object.entries(expected).some(([key, item]) => existing[key] !== item)) throw failure();
+      if (!existing) this.#database.prepare("INSERT INTO signed_intents VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved')")
+        .run(transferId, approvalDigest, transactionDigest, transactionHash, account, nonce, signedHex);
       this.#database.exec("COMMIT");
       return Object.freeze({ created: !existing, state: existing?.state ?? "reserved", mayBroadcast: false });
     } catch {
@@ -98,11 +105,30 @@ export class BroadcastIntentJournal {
     }
   }
 
+  inspect(transferId) {
+    try {
+      if (!digest(transferId)) throw failure();
+      this.#path.verify();
+      const row = this.#database.prepare("SELECT * FROM signed_intents WHERE transfer_id = ?").get(transferId);
+      if (!row) return Object.freeze({ found: false, mayBroadcast: false });
+      const tx = Transaction.from(row.signed_hex);
+      if (!digest(row.transfer_id) || !digest(row.approval_digest) || !["reserved", "uncertain"].includes(row.state)
+          || !tx.isSigned() || tx.type !== 0 || tx.chainId !== 338n || tx.serialized !== row.signed_hex
+          || tx.from !== row.account || String(tx.nonce) !== row.nonce
+          || keccak256(row.signed_hex) !== row.transaction_hash
+          || `0x${createHash("sha256").update(Buffer.from(row.signed_hex.slice(2), "hex")).digest("hex")}` !== row.transaction_digest) throw failure();
+      return Object.freeze({ found: true, state: row.state, transferId: row.transfer_id,
+        approvalDigest: row.approval_digest, transactionDigest: row.transaction_digest,
+        transactionHash: row.transaction_hash, account: row.account, nonce: row.nonce,
+        signedHex: row.signed_hex, mayBroadcast: false });
+    } catch { throw failure(); }
+  }
+
   markUncertain(transferId) {
     if (!digest(transferId)) throw failure();
     try {
       this.#path.verify();
-      const result = this.#database.prepare("UPDATE broadcast_intents SET state = 'uncertain' WHERE transfer_id = ?").run(transferId);
+      const result = this.#database.prepare("UPDATE signed_intents SET state = 'uncertain' WHERE transfer_id = ?").run(transferId);
       if (result.changes !== 1) throw failure();
       return Object.freeze({ state: "uncertain", mayBroadcast: false });
     } catch { throw failure(); }
