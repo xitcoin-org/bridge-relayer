@@ -95,3 +95,17 @@ SQLite lock timeouts, killed initialization and uncertainty transactions,
 restart, invalid database/nonregular WAL conditions, conflicting identities,
 repeated ambiguous attempts and permanent uncertainty. These are local storage/status
 tests with synthetic hashes, not chain transactions, power-loss tests or operational adapter validation.
+
+## Signer transport hardening (not destination readiness)
+
+The signer approval client now counts streamed response bytes before retaining
+chunks and rejects oversized, malformed UTF-8 and nonstreaming responses. Its
+overall deadline covers authentication, response headers and body reads; read
+failure cancels the stream without waiting indefinitely for cancellation.
+Redirects remain forbidden. Offline tests use synthetic responses and stalled
+promises; no signer service is contacted. Injected dependencies must honor abort
+to release their own resources even though the caller settles on deadline.
+
+This hardening does not cover the existing ethers-based CometBFT or Cronos
+transports, which still need bounded streaming review before use by destination
+adapters. It supplies no broadcast permission and leaves startup disabled.
