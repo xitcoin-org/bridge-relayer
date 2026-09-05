@@ -109,3 +109,35 @@ to release their own resources even though the caller settles on deadline.
 This hardening does not cover the existing ethers-based CometBFT or Cronos
 transports, which still need bounded streaming review before use by destination
 adapters. It supplies no broadcast permission and leaves startup disabled.
+
+## Offline Xitcoin message construction (operational-v1)
+
+`prepareXitcoinAttestation` builds only
+`/cosmos.evm.bridge.v1.MsgSubmitAttestation`, using the verbatim pinned
+[transaction schema](evidence/xitcoin-tx.proto) and the generated `tx.pb.go`
+marshal tags at the same pos-chain commit. It binds the local plan to
+`xitcoin-testnet-v2-1`, source chain `338`, and the disabled manifest route.
+It verifies every signature against an explicitly supplied three-member set,
+rejects duplicate/unauthorized approvals and altered request digests, and orders
+signatures deterministically. That supplied set still requires authenticated
+canonical chain-state evidence before runtime use. Input snapshots reject object
+traps, excessive depth/size, coercion and unsafe integers. Output strings and
+metadata are frozen; `messageDigest` is SHA-256 of the message only, **not a
+transaction hash**. Chain ID is plan metadata; this message schema has no
+chain-ID field for the destination. Transaction-level binding is still missing.
+
+Local stricter policy requires canonical decimal strings, positive uint64 nonce,
+positive uint256 amount, safe-integer positive int64 deadline, canonical 20-byte
+`xtc` addresses and 2–3 signatures. This intentionally rejects some representations
+the chain may normalize. The fixture uses synthetic public keys, not chain
+transactions; its byte layout is checked against the pinned generated Go encoder.
+A chain-generated differential signing vector remains required.
+
+Additional inspected evidence: pos-chain `encoding/config.go` selects SDK
+`tx.DefaultSignModes`, and `go.mod` pins Cosmos SDK v0.54.4 and CometBFT v0.39.4.
+Those dependency declarations alone do not validate this relayer's TxRaw,
+AuthInfo, SignDoc, public-key Any, signer account type, account query responses,
+fees, execution response handling or finality verifier. None is fabricated here.
+Testnets commit `1633957e805f6782b201a623335c9eebafa0cece`,
+`xitcoin-testnet-v2-1/chain.json`, identifies `axtc` and a disabled, unconfigured
+bridge route; no live endpoint was queried. `mayBroadcast` remains false.
