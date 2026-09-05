@@ -64,3 +64,17 @@ test("successful simulated inclusion still needs finality; failed execution is e
     { data: "0x" }, { topics: [evidence.logs[0].topics[0], `0x${"ff".repeat(32)}`, evidence.logs[0].topics[2]] }])
     rejects(() => inspectCronosInclusion(plan, signed, { ...evidence, logs: [{ ...evidence.logs[0], ...patch }] }));
 });
+
+// Regression: shared approval verification accepts Xitcoin 0/1 recovery bytes,
+// but passing them unchanged to the reviewed EVM vault would revert.
+test("Cronos requires original vault-compatible recovery bytes", () => {
+  for (const index of [0, 1]) {
+    const input = outbound();
+    const signature = input.approvals[index].signature;
+    input.approvals[index].signature = signature.slice(0, 130)
+      + (Number.parseInt(signature.slice(130), 16) - 27).toString(16).padStart(2, "0");
+    rejects(() => prepareCronosRelease(input));
+  }
+  const input = outbound();
+  rejects(() => prepareCronosRelease({ ...input, approvals: [...input.approvals].reverse() }));
+});
