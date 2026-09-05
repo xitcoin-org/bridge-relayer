@@ -85,15 +85,20 @@ export class RelayStore {
     if (!progress.has(nextState)) throw new Error("unknown lifecycle state");
     const current = this.get(sourceChain, sourceRef);
     if (!current) throw new Error("transfer not found");
+    if (["completed", "failed", "reorged"].includes(current.state)) throw new Error("terminal lifecycle state is immutable");
+    if (details.destinationRef != null && (nextState !== "submitted"
+        || (current.destination_ref !== null && current.destination_ref !== details.destinationRef))) {
+      throw new Error("destination reference is immutable");
+    }
     const terminalOverride = nextState === "failed" || nextState === "reorged";
     if (!terminalOverride && progress.get(nextState) !== progress.get(current.state) + 1) {
       throw new Error(`invalid lifecycle transition ${current.state} -> ${nextState}`);
     }
-    this.database.prepare(`
+    const result = this.database.prepare(`
       UPDATE transfers
       SET state = ?, destination_ref = COALESCE(?, destination_ref),
           error = ?, updated_at = ?
-      WHERE source_chain = ? AND source_ref = ?
+      WHERE source_chain = ? AND source_ref = ? AND state = ? AND destination_ref IS ?
     `).run(
       nextState,
       details.destinationRef ?? null,
@@ -101,7 +106,10 @@ export class RelayStore {
       Math.floor(Date.now() / 1000),
       sourceChain,
       sourceRef.toLowerCase(),
+      current.state,
+      current.destination_ref,
     );
+    if (result.changes !== 1) throw new Error("concurrent lifecycle transition");
     return this.get(sourceChain, sourceRef);
   }
 
@@ -133,7 +141,11 @@ export class RelayStore {
         WHERE source_chain = ? AND source_ref = ? AND state = 'finalized' AND approval_request IS NULL
       `).run(encoded, Math.floor(Date.now() / 1000), sourceChain, sourceRef.toLowerCase());
     }
-    return JSON.parse(this.get(sourceChain, sourceRef).approval_request);
+    const persisted = this.get(sourceChain, sourceRef);
+    if (persisted.state !== "finalized" || persisted.approval_request !== encoded) {
+      throw new Error("concurrent or conflicting approval request");
+    }
+    return JSON.parse(persisted.approval_request);
   }
 
   approvalRequest(sourceChain, sourceRef) {
@@ -195,14 +207,17 @@ export class RelayStore {
     if (current && blockHeight === current.block_height && normalizedHash !== current.block_hash) {
       throw new Error("checkpoint finality violation");
     }
-    this.database.prepare(`
+    const result = this.database.prepare(`
       INSERT INTO checkpoints (source_chain, block_height, block_hash, updated_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(source_chain) DO UPDATE SET
         block_height = excluded.block_height,
         block_hash = excluded.block_hash,
         updated_at = excluded.updated_at
+      WHERE checkpoints.block_height < excluded.block_height
+         OR (checkpoints.block_height = excluded.block_height AND checkpoints.block_hash = excluded.block_hash)
     `).run(sourceChain, blockHeight, normalizedHash, Math.floor(Date.now() / 1000));
+    if (result.changes !== 1) throw new Error("concurrent checkpoint regression or finality violation");
     return this.checkpoint(sourceChain);
   }
 
