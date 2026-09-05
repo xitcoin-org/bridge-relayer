@@ -75,7 +75,7 @@ test("remote signer transport requires safe URLs and bounded JSON", async () => 
   let observedAuthorization;
   const client = new RemoteSignerClient({ url: "http://127.0.0.1:9000/approve", identity: "local-test", allowHttp: true,
     authorizationHeader: async () => `Bearer ${"a".repeat(32)}`,
-    fetchImpl: async (_url, options) => { observedAuthorization = options.headers.authorization; return ({ ok: true, status: 200, headers: { get: () => "2" }, async text() { return "{}"; } }); },
+    fetchImpl: async (_url, options) => { observedAuthorization = options.headers.authorization; return new Response("{}", { headers: { "content-length": "2" } }); },
   });
   assert.deepEqual(await client.approve(inbound()), {});
   assert.equal(observedAuthorization, `Bearer ${"a".repeat(32)}`);

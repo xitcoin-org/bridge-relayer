@@ -1,4 +1,4 @@
-import { Buffer } from "node:buffer";
+import { readBoundedText, withDeadline } from "./bounded-response.js";
 import {
   Signature,
   getAddress,
@@ -152,23 +152,21 @@ export class RemoteSignerClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let body;
     try {
-      const authorization = String(await this.authorizationHeader());
+      const authorization = String(await withDeadline(() => this.authorizationHeader(), controller.signal));
       if (!authorization.startsWith("Bearer ") || authorization.length < 39 || /[\r\n]/.test(authorization)) {
         throw new Error("signer transport authentication is invalid");
       }
-      const response = await this.fetch(this.url, {
+      const response = await withDeadline(() => this.fetch(this.url, {
         method: "POST",
         headers: { accept: "application/json", authorization, "content-type": "application/json" },
         body: JSON.stringify(request),
         redirect: "error",
         signal: controller.signal,
-      });
+      }), controller.signal);
       if (!response.ok) throw new Error(`signer returned HTTP ${response.status}`);
-      const declared = Number(response.headers?.get?.("content-length") ?? 0);
-      if (declared > this.maxResponseBytes) throw new Error("signer response exceeds size limit");
-      body = await response.text();
-      if (Buffer.byteLength(body) > this.maxResponseBytes) throw new Error("signer response exceeds size limit");
+      body = await readBoundedText(response, { maxBytes: this.maxResponseBytes, signal: controller.signal });
     } finally {
+      controller.abort();
       clearTimeout(timer);
     }
     try {
