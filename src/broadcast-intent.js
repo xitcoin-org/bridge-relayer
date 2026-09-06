@@ -71,6 +71,13 @@ export class BroadcastIntentJournal {
     if (this.#database.prepare("PRAGMA quick_check").get().quick_check !== "ok") throw failure();
   }
 
+  assertManifest(config) {
+    try {
+      const manifest = validateSubmitterManifest(config);
+      if (this.#binding !== JSON.stringify({ schemaVersion: 1, manifest, chainSchema: CHAIN_SCHEMA })) throw failure();
+    } catch { throw failure(); }
+  }
+
   reserve(input) {
     if (!input || typeof input !== "object" || Array.isArray(input)
         || Object.keys(input).length !== 3

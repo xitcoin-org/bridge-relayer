@@ -157,8 +157,85 @@ Coordinator source evidence is structurally validated when supplied, but remains
 external to the attestation wire message and its digest. Independent source
 finality validation is still mandatory before any runtime submission.
 
+## Offline Cronos call and custody inspection (operational-v1)
+
+`prepareCronosRelease` encodes the reviewed vault `release` call after verifying
+an authorized 2-of-3 quorum, chain ID 338, exact vault/route/code-hash identity,
+false pause/replay flags, and signer-set version. Identity and state are supplied
+**offline evidence**, not verified observations of a deployment. Code hashes in
+tests are synthetic. No RPC or live deployment is consulted. Caller policy caps
+bound gas, gas price and their uint256 product; no fee estimate or supported fee
+mode is asserted. Legacy transactions are inspected only as offline candidates;
+Cronos legacy/EIP-1559 support still needs pinned authoritative verification.
+
+`inspectCronosSignedTransaction` accepts at most 16 KiB of canonical signed legacy
+transaction bytes and checks every transaction field, EIP-155 chain ID, sender,
+nonce and exact calldata against the immutable plan. It derives Keccak-256
+transaction hash and a separate SHA-256 custody digest. Frozen string custody
+objects carry a process-local provenance check; copying or deserializing an
+object does not recreate that check. This is not a keystore or signer interface.
+
+`inspectCronosInclusion` validates a bounded **normalized offline fixture**, not
+raw provider JSON: chain ID, transaction hash, equal observed/canonical block
+hashes, explicit receipt status and exactly one matching vault Released event.
+The exact signed input additionally binds fields absent from the event. Status
+zero is failed execution; removed logs, wrong amount/recipient/version and block
+changes fail closed. Matching block hashes supplied by a caller are not a
+consensus proof. It always reports `finalized: false` and `mayBroadcast: false`.
+
+`readDestinationResponse` bounds response acquisition and streamed bytes before
+JSON parsing, rejects malformed UTF-8 and unsafe object shapes, and sanitizes
+errors. Its injected reader must honor abort and enforce endpoint identity and
+redirect rules. No actual transport, broadcast-response semantic parser, status
+lookup, independent receipt source or finality policy is connected. Every new
+entrypoint remains outside operational startup.
+
+## Durable offline Cronos reservations (operational-v1)
+
+`SignedIntentJournal` is a separate, exact-schema SQLite custody database. It
+reuses the existing private-path checks, immediate transactions, FULL sync and
+WAL policy. It accepts only process-local custody produced by the reviewed
+Cronos inspector, stores exact signed bytes and immutable vault/code-hash/route identity, and uniquely reserves both the
+transaction hash/digest and `(account, nonce)`. Identical reservations are
+idempotent; replacements and nonce reuse are forbidden even after uncertainty.
+There is no release, delete, expiry, reset, migration, broadcast or completion
+API. It rejects another destination or release and never adopts a v1 digest
+journal as custody. Inspecting an absent row grants no send permission.
+Stored bytes are rehashed and parsed on inspection. This does not authenticate
+arbitrary local database changes or protect against restoring an older backup.
+
+`reserveStoredCronosIntent` holds the RelayStore under an immediate transaction,
+rebuilds the exact persisted approval request from the observed transfer and
+source evidence, re-verifies stored approvals, then binds exact signed bytes to
+that request. It commits signed custody before the BroadcastIntentJournal digest
+reservation. A crash between those commits retains blocking custody; repeating
+the exact reservation can fill the missing digest entry. Uncertainty in either
+journal propagates to both on the next successful reservation. Conflicts never
+replace an entry. The two journal commits are deliberately not claimed to be one
+atomic cross-database transaction: partial results block and require inspection.
+Relay lifecycle state remains `approved`; this API cannot submit or complete.
+
+Tests use real competing child processes and SIGKILL around reservation and
+simulated send boundaries, plus nonce races, altered stored payloads/approvals,
+corrupted schema/hash, release mismatches and filesystem attacks. A simulated
+send is only a local marker after committed uncertainty, not a network call.
+These are process-crash tests, not power-loss or storage rollback tests.
+
+Remaining integration blockers include independent authorization of supplied
+signer/code/state evidence, an exclusive operational account (including other
+programs and all ledger paths), chain nonce lookup, Xitcoin sequence/custody,
+authenticated destination status reconciliation after expiry, exact finality
+proof and a reviewed release migration preserving pending state. The RelayStore
+race fixes from merged PR #44 are integrated. The existing staging submission
+helper remains an offline mock-oriented path, not a production coordinator.
+No operational startup imports the new modules. Every reservation, custody and
+inclusion result keeps `mayBroadcast: false`.
 The optional `test/reference/verify-xitcoin-protobuf.py` independently constructs
 a descriptor from the pinned proto with Python protobuf 6.33.5, decodes the
 synthetic fixture and deterministically re-encodes identical bytes. This check
 was executed in an isolated temporary environment; protobuf is not a runtime
 relayer dependency. It does not replace a chain-generated signing vector.
+
+The shared streamed reader also caps read operations: endless immediately resolved
+empty chunks cannot starve the timer without exhausting a byte budget. This
+fail-closed cap applies to signer responses as well as destination fixtures.
