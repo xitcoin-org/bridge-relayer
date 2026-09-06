@@ -225,8 +225,8 @@ Remaining integration blockers include independent authorization of supplied
 signer/code/state evidence, an exclusive operational account (including other
 programs and all ledger paths), chain nonce lookup, Xitcoin sequence/custody,
 authenticated destination status reconciliation after expiry, exact finality
-proof, review and integration of the independent RelayStore race fixes in PR #44, and a reviewed
-release migration preserving pending state. The existing staging submission
+proof and a reviewed release migration preserving pending state. The RelayStore
+race fixes from merged PR #44 are integrated. The existing staging submission
 helper remains an offline mock-oriented path, not a production coordinator.
 No operational startup imports the new modules. Every reservation, custody and
 inclusion result keeps `mayBroadcast: false`.
