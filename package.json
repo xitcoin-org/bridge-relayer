@@ -8,7 +8,7 @@
     "node": "24.19.0"
   },
   "scripts": {
-    "check": "node --check src/*.js test/*.js",
+    "check": "node scripts/check-syntax.mjs",
     "test": "node --test",
     "vectors": "node src/vectors.js",
     "preflight:testnet": "node src/preflight-cli.js",
