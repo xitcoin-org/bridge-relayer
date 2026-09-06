@@ -33,8 +33,6 @@ jobs:
       - run: npm run vectors
       - name: Audit production dependencies
         shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           audit_output=""
           for attempt in 1 2 3; do
@@ -54,9 +52,4 @@ jobs:
               sleep $((attempt * 10))
             fi
           done
-          if printf '%s\n' "$audit_output" | grep -Eq 'audit network timeout|audit endpoint returned an error' &&
-            git diff --quiet "$BASE_SHA" HEAD -- package.json package-lock.json; then
-            echo "::warning::npm audit registry unavailable; dependency manifests are unchanged from the reviewed base"
-            exit 0
-          fi
           exit "$audit_status"
